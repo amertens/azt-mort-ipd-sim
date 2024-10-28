@@ -256,7 +256,7 @@ analyze_subgroups <- function(data) {
 }
 
 # Function to meta-analyze subgroup results
-meta_analyze_subgroups <- function(studies_data) {
+meta_analyze_subgroups <- function(studies_data, method="REML") {
   
   # Split by study
   by_study <- split(studies_data, studies_data$study)
@@ -273,7 +273,7 @@ meta_analyze_subgroups <- function(studies_data) {
                       c("sex_female", "sex_male"))
   
   # Do meta-analysis for each type of analysis
-  for(i in seq_along(analysis_names)) {
+  for(i in seq_along(analysis_names)){
     name <- analysis_names[i]
     
     # Extract coefficients and SEs for this analysis
@@ -284,15 +284,33 @@ meta_analyze_subgroups <- function(studies_data) {
     valid <- !is.na(coefs) & !is.na(ses)
     
     if(sum(valid) >= 2) {  # Need at least 2 studies for meta-analysis
-      meta_fit <- rma(yi = coefs[valid], 
-                      sei = ses[valid],
-                      method = "REML")
       
+      meta_fit=NULL
+      try(meta_fit<-rma(yi=coefs[valid], sei= ses[valid],  method=method, measure="GEN"))
+      if(is.null(meta_fit)){try(meta_fit<-rma(yi=coefs[valid], sei= ses[valid],  method="ML", measure="GEN"))}
+      if(is.null(meta_fit)){try(meta_fit<-rma(yi=coefs[valid], sei= ses[valid],  method="DL", measure="GEN"))}
+      if(is.null(meta_fit)){try(meta_fit<-rma(yi=coefs[valid], sei= ses[valid],  method="HE", measure="GEN"))}
       results[[name]] <- meta_fit
     } else {
       results[[name]] <- NULL
     }
   }
   
-  return(results)
+  #bind list result:
+  study_res_df <- data.frame(t(do.call(rbind, study_results)))
+  
+  study_res_df$temp <- rownames(study_res_df)
+  study_res_df$temp <- gsub(".treatment", "", study_res_df$temp)
+  study_res_df$group <- str_split_i(study_res_df$temp, "\\.", 1)
+  study_res_df$est <- str_split_i(study_res_df$temp, "\\.", 2)
+  study_res_df_coef <- study_res_df %>% filter(est=="coef") %>% select(-c(temp,est))  
+  study_res_df_se <- study_res_df %>% filter(est=="se") %>% select(-c(temp,est))    
+  study_res_df_coef <- study_res_df_coef %>%
+    pivot_longer(cols = -c(group), names_to = "study",values_to = "effect")
+  study_res_df_se <- study_res_df_se %>%
+    pivot_longer(cols = -c(group), names_to = "study",values_to = "se")
+  
+  study_res_df <- left_join(study_res_df_coef,study_res_df_se,by=c("group","study"))
+  
+  return(list(results=results, study_results=study_res_df))
 }
