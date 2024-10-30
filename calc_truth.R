@@ -86,7 +86,7 @@ study_params$TANA_I$cluster_size <- 1000
 
     truth%>%knitr::kable()
   
-  saveRDS(truth, file=here("study"))
+  saveRDS(truth, file=here("results/truth.rds"))
   
   #need to figure out how to include person-time
   
