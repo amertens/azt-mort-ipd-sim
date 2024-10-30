@@ -8,6 +8,7 @@ library(metafor)
 library(foreach)
 library(doParallel)
 source("simulation_functions.R")
+source("sim_data_functions.R")
 source("study_params.R")
 
 
@@ -37,6 +38,12 @@ for(sim in iter_range[1]:iter_range[2]){
           study_name = study_name
         )
       }))
+      
+      # Test for interactions
+      #interaction_results[[sim]] <- lapply(split(sim_study_data, sim_data$study), test_interactions)
+      # interaction_results <- lapply(split(sim_study_data, sim_study_data$study), test_interactions)
+      # head(interaction_results)
+
       
       # Run meta-analyses
       results_list  <- meta_analyze_subgroups(sim_study_data, method=meta_method)

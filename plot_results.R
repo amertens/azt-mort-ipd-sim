@@ -1,6 +1,8 @@
 
 # Plot results
 library(tidyverse)
+library(metafor)
+library(here)
 source("meta_functions.R")
 
 sim_results_full<-readRDS(file=here("results/sim_results_interim.rds"))
@@ -68,7 +70,7 @@ power_results <- res %>% group_by(group) %>%
             # mean_se=mean(se, na.rm=TRUE), 
             # mean_tau2=mean(tau2, na.rm=TRUE)  $add to function
             )
-
+power_results
 
 res_FE = study_results %>% group_by(iteration, group) %>%
   do(nb_meta(log_irr=.$effect, se_log_irr=.$se, study_labels=.$study, method="FE"))
@@ -77,11 +79,12 @@ res_FE
 
 
 power_results_FE <- res_FE %>% group_by(group) %>% 
-  summarize(power=mean(pval<0.000001, na.rm=TRUE), 
+  summarize(power=mean(pval<0.01, na.rm=TRUE), 
             mean_effect=exp(mean(log(irr), na.rm=TRUE)))
 power_results_FE
 
-
+saveRDS(res, file=here("results/pooled_res.rds"))
+saveRDS(res_FE, file=here("results/pooled_res_FE.rds"))
 
 
 
