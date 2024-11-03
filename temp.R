@@ -1,4 +1,17 @@
 
+df1 <- readRDS(here("results/sim_results_interim.rds"))
+table(df1$iteration)
+
+df <- readRDS("C:/Users/andre/Downloads/sim_results_interim_par.rds") %>% distinct()
+table(df$iteration)
+dim(df)
+head(df)
+
+df %>% group_by(study, group, level) %>% summarise(mean = mean(treated_rate ), sd = sd(treated_rate ), n = n())
+
+dim(df)
+
+
 data = sim_study_data %>% filter(study == "TANA_I")
 subgroup = "age_group"     # "age_group", "sex", or NULL
 subgroup_level = "1-5mo" # specific level for subgroup
