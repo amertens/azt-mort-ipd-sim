@@ -4,12 +4,8 @@
 # Load required packages
 rm(list=ls())
 library(tidyverse)
-library(survival)
-library(lme4)
 library(here)
 library(metafor)
-library(foreach)
-library(doParallel)
 source("sim_data_functions.R")
 source("study_params.R")
 
