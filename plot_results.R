@@ -9,6 +9,22 @@ sim_results_full<-readRDS(file=here("results/sim_results_interim.rds"))
 sim_results_pooled <- sim_results_full %>% filter(study=="pooled")
 study_results <- sim_results_full %>% filter(study!="pooled")
 
+study_results <- study_results %>% group_by(study) %>% mutate(med_effect=median(exp(effect))) 
+table(study_results$med_effect)
+
+ggplot(study_results, 
+       aes(x=exp(effect), y=se, color=group)) +
+  geom_point() +
+  facet_wrap(~study) +
+  scale_x_continuous(trans="log10") +
+  coord_cartesian(xlim=c(0.1, 2)) +
+  geom_vline(xintercept=1, linetype="dashed") +
+  geom_vline(aes(xintercept=med_effect), linetype="dashed", color="red") +
+  labs(title="Study Results",
+       x="Effect Size",
+       y="Standard Error") +
+  theme_minimal()
+
 
 power_results <- sim_results_pooled %>% group_by(group) %>% 
   summarize(power=mean(pvalue<0.05, na.rm=TRUE), 
@@ -31,24 +47,24 @@ power_summary$analysis <- rownames(power_summary)
 
 plotdf <- power_summary
 
-ggplot(plotdf, aes(x=analysis, y=power)) +
-  geom_bar(stat="identity") +
-  coord_flip() +
-  labs(title="Statistical Power by Analysis",
-       x="Analysis", 
-       y="Power") +
-  theme_minimal()
-
-# Effect size comparison
-ggplot(plotdf, aes(x=analysis, y=mean_effect)) +
-  geom_point() +
-  geom_errorbar(aes(ymin=mean_effect-1.96*mean_se, 
-                    ymax=mean_effect+1.96*mean_se)) +
-  coord_flip() +
-  labs(title="Effect Sizes by Analysis",
-       x="Analysis",
-       y="Risk Ratio") +
-  theme_minimal()
+# ggplot(plotdf, aes(x=analysis, y=power)) +
+#   geom_bar(stat="identity") +
+#   coord_flip() +
+#   labs(title="Statistical Power by Analysis",
+#        x="Analysis", 
+#        y="Power") +
+#   theme_minimal()
+# 
+# # Effect size comparison
+# ggplot(plotdf, aes(x=analysis, y=mean_effect)) +
+#   geom_point() +
+#   geom_errorbar(aes(ymin=mean_effect-1.96*mean_se, 
+#                     ymax=mean_effect+1.96*mean_se)) +
+#   coord_flip() +
+#   labs(title="Effect Sizes by Analysis",
+#        x="Analysis",
+#        y="Risk Ratio") +
+#   theme_minimal()
 
 
 #TO DO:

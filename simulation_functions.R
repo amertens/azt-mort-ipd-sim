@@ -27,124 +27,127 @@ analyze_meta_analysis <- function(studies_data,  method = "REML", adjusted=TRUE)
 
 
 
-check_simulated_variation <- function(sim_data) {
-  # Calculate empirical CVs from simulated data
-  empirical_cvs <- by(sim_data, sim_data$study, function(x) {
-    # Calculate CV of mortality rates
-    rates <- x$deaths/exp(x$log_offset)
-    sd(rates)/mean(rates)
-  })
-  
-  # Compare to input CVs
-  cv_comparison <- data.frame(
-    study = names(study_params),
-    input_cv = sapply(study_params, `[[`, "cv"),
-    simulated_cv = as.numeric(empirical_cvs)
-  )
-  
-  return(cv_comparison)
-}
 
 
 
 # Function to analyze subgroups for a single study
-analyze_subgroups <- function(data) {
+analyze_subgroups <- function(data, adjusted=TRUE, run_tmle=TRUE) {
   
   # Main effect
-  main <- analyze_trial_data(data, adjusted=TRUE)
-  names(main) <- c("coef", "se" )
-  
-  # Age subgroups - analyze each separately
-  age_groups <- c("1-5mo", "6-11mo", "12-23mo", "24-59mo")
-  age_results <- lapply(age_groups, function(age) {
-    sub_data <- subset(data, age_group == age)
-    fit <- try({analyze_trial_data(sub_data, adjusted=TRUE, age_subgroup=TRUE)}, silent=TRUE)
-    
-    if(!inherits(fit, "try-error")) {
-      names(fit) <- c("coef", "se" )
-      fit
-    } else {
-      c(coef = NA, se = NA)
-    }
+  main <- analyze_trial_data(data, adjusted=adjusted, run_tmle=run_tmle)
+
+  # Age subgroup analysis
+  age_results <- lapply(unique(data$age_group), function(age) {
+    analyze_trial_data(data, subgroup = "age_group", subgroup_level = age, adjusted=adjusted, run_tmle=run_tmle)
   })
-  names(age_results) <- paste0("age_", age_groups)
+  names(age_results) <- unique(data$age_group)
+  age_results=data.table::rbindlist(age_results, use.names = TRUE, idcol = "level") %>% mutate(group="age_group")
   
-  # Sex subgroups
-  sex_results <- lapply(c(0,1), function(sex_val) {
-    sub_data <- subset(data, sex == sex_val)
-    fit <- try({analyze_trial_data(sub_data, adjusted=TRUE, sex_subgroup=TRUE)}, silent=TRUE)
-    names(fit) <- c("coef", "se" )
-    fit
+  # Sex subgroup analysis
+  sex_results <- lapply(c(0,1), function(sex) {
+    analyze_trial_data(data, subgroup = "sex", subgroup_level = sex, adjusted=adjusted, run_tmle=run_tmle)
   })
-  names(sex_results) <- c("sex_female", "sex_male")
+  names(sex_results) <- c("female", "male")
+  sex_results=data.table::rbindlist(sex_results, use.names = TRUE, idcol = "level") %>% mutate(group="sex")
   
+  results = bind_rows(main %>% mutate(group="main", level="main"),
+                      age_results,
+                      sex_results)
+
   # Return all results
-  c(
-    main = main,
-    do.call(c, age_results),
-    do.call(c, sex_results)
-  )
+  return(results)
 }
 
-# Function to meta-analyze subgroup results
-meta_analyze_subgroups <- function(studies_data, method="REML") {
-  
-  # Split by study
-  by_study <- split(studies_data, studies_data$study)
-  
+
+
+# Function to get all estimator and subgroup results
+run_analysis <- function(studies_data, adjusted=TRUE, run_tmle=TRUE) {
+
+  full_res=NULL
   # Get subgroup results for each study
-  study_results <- lapply(by_study, analyze_subgroups)
-  
-  # Organize results into matrices for meta-analysis
-  results <- list()
-  
-  # Names of all analyses (main + subgroups)
-  analysis_names <- c("main", 
-                      paste0("age_", c("1-5mo", "6-11mo", "12-23mo", "24-59mo")),
-                      c("sex_female", "sex_male"))
-  
-  # Do meta-analysis for each type of analysis
-  for(i in seq_along(analysis_names)){
-    name <- analysis_names[i]
-    
-    # Extract coefficients and SEs for this analysis
-    coefs <- sapply(study_results, function(x) x[paste0(name, ".coef")])
-    ses <- sapply(study_results, function(x) x[paste0(name, ".se")])
-    
-    # Remove any NA results
-    valid <- !is.na(coefs) & !is.na(ses)
-    
-    if(sum(valid) >= 2) {  # Need at least 2 studies for meta-analysis
-      
-      meta_fit=NULL
-      try(meta_fit<-rma(yi=coefs[valid], sei= ses[valid],  method=method, measure="GEN"))
-      if(is.null(meta_fit)){try(meta_fit<-rma(yi=coefs[valid], sei= ses[valid],  method="ML", measure="GEN"))}
-      if(is.null(meta_fit)){try(meta_fit<-rma(yi=coefs[valid], sei= ses[valid],  method="DL", measure="GEN"))}
-      if(is.null(meta_fit)){try(meta_fit<-rma(yi=coefs[valid], sei= ses[valid],  method="HE", measure="GEN"))}
-      results[[name]] <- meta_fit
-    } else {
-      results[[name]] <- NULL
-    }
+  for(i in unique(studies_data$study)){
+    df <- studies_data %>% filter(study==i)
+    res=NULL
+    try(res <- analyze_subgroups(data=df, adjusted=adjusted, run_tmle=run_tmle))
+    full_res=bind_rows(full_res,res)
   }
   
-  #bind list result:
-  study_res_df <- data.frame(t(do.call(rbind, study_results)))
+  #NEED TO DEBUG UNADJUSTED COX PH
   
-  study_res_df$temp <- rownames(study_res_df)
-  study_res_df$temp <- gsub(".treatment", "", study_res_df$temp)
-  study_res_df$group <- str_split_i(study_res_df$temp, "\\.", 1)
-  study_res_df$est <- str_split_i(study_res_df$temp, "\\.", 2)
-  study_res_df_coef <- study_res_df %>% filter(est=="coef") %>% select(-c(temp,est))  
-  study_res_df_se <- study_res_df %>% filter(est=="se") %>% select(-c(temp,est))    
-  study_res_df_coef <- study_res_df_coef %>%
-    pivot_longer(cols = -c(group), names_to = "study",values_to = "effect")
-  study_res_df_se <- study_res_df_se %>%
-    pivot_longer(cols = -c(group), names_to = "study",values_to = "se")
+  res= studies_data %>% group_by(study) %>%
+    do(res=analyze_subgroups(data=., adjusted=adjusted, run_tmle=run_tmle))
+
+  full_res=NULL
+  for(i in 1:length(res$res)){
+    temp=res$res[[i]]
+    temp$study=res$study[i]
+    full_res=bind_rows(full_res,temp)
+  }
   
-  study_res_df <- left_join(study_res_df_coef,study_res_df_se,by=c("group","study"))
-  
-  return(list(results=results, study_results=study_res_df))
+
+  return(full_res)
 }
+
+# 
+# # Function to meta-analyze subgroup results
+# meta_analyze_subgroups <- function(studies_data, method="REML", adjusted=TRUE, run_tmle=TRUE) {
+#   
+#   # Split by study
+#   by_study <- split(studies_data, studies_data$study)
+#   
+#   # Get subgroup results for each study
+#   study_results <- lapply(by_study, analyze_subgroups(adjusted=adjusted, run_tmle=run_tmle))
+#   
+#   # Organize results into matrices for meta-analysis
+#   results <- list()
+#   
+#   # Names of all analyses (main + subgroups)
+#   analysis_names <- c("main", 
+#                       paste0("age_", c("1-5mo", "6-11mo", "12-23mo", "24-59mo")),
+#                       c("sex_female", "sex_male"))
+#   
+#   # Do meta-analysis for each type of analysis
+#   for(i in seq_along(analysis_names)){
+#     name <- analysis_names[i]
+#     
+#     # Extract coefficients and SEs for this analysis
+#     coefs <- sapply(study_results, function(x) x[paste0(name, ".coef")])
+#     ses <- sapply(study_results, function(x) x[paste0(name, ".se")])
+#     
+#     # Remove any NA results
+#     valid <- !is.na(coefs) & !is.na(ses)
+#     
+#     if(sum(valid) >= 2) {  # Need at least 2 studies for meta-analysis
+#       
+#       meta_fit=NULL
+#       try(meta_fit<-rma(yi=coefs[valid], sei= ses[valid],  method=method, measure="GEN"))
+#       if(is.null(meta_fit)){try(meta_fit<-rma(yi=coefs[valid], sei= ses[valid],  method="ML", measure="GEN"))}
+#       if(is.null(meta_fit)){try(meta_fit<-rma(yi=coefs[valid], sei= ses[valid],  method="DL", measure="GEN"))}
+#       if(is.null(meta_fit)){try(meta_fit<-rma(yi=coefs[valid], sei= ses[valid],  method="HE", measure="GEN"))}
+#       results[[name]] <- meta_fit
+#     } else {
+#       results[[name]] <- NULL
+#     }
+#   }
+#   
+#   #bind list result:
+#   study_res_df <- data.frame(t(do.call(rbind, study_results)))
+#   
+#   study_res_df$temp <- rownames(study_res_df)
+#   study_res_df$temp <- gsub(".treatment", "", study_res_df$temp)
+#   study_res_df$group <- str_split_i(study_res_df$temp, "\\.", 1)
+#   study_res_df$est <- str_split_i(study_res_df$temp, "\\.", 2)
+#   study_res_df_coef <- study_res_df %>% filter(est=="coef") %>% select(-c(temp,est))  
+#   study_res_df_se <- study_res_df %>% filter(est=="se") %>% select(-c(temp,est))    
+#   study_res_df_coef <- study_res_df_coef %>%
+#     pivot_longer(cols = -c(group), names_to = "study",values_to = "effect")
+#   study_res_df_se <- study_res_df_se %>%
+#     pivot_longer(cols = -c(group), names_to = "study",values_to = "se")
+#   
+#   study_res_df <- left_join(study_res_df_coef,study_res_df_se,by=c("group","study"))
+#   
+#   return(list(results=results, study_results=study_res_df))
+# }
 
 
 
@@ -240,41 +243,248 @@ calculate_subgroup_power <- function(
 }
 
 
-# Function to analyze trial data with clustered SEs
-analyze_trial_data <- function(data, adjusted=TRUE, age_subgroup=FALSE, sex_subgroup=FALSE){
+# # Function to analyze trial data with clustered SEs
+# analyze_trial_data <- function(data, adjusted=TRUE, age_subgroup=FALSE, sex_subgroup=FALSE){
+#   
+#   browser()
+#   
+#   # Fit model
+#   if(adjusted){
+#     # Adjusted analysis
+#     if(age_subgroup){
+#       fit <- MASS::glm.nb(deaths ~ treatment + sex + stunted +
+#                             log(distance) + wealth_quintile + season + 
+#                             offset(log_offset), data = data)
+#     }
+#     if(sex_subgroup){
+#       fit <- MASS::glm.nb(deaths ~ treatment + age_group  + stunted +
+#                             log(distance) + wealth_quintile + season + 
+#                             offset(log_offset), data = data)
+#     }
+#     
+#     if(!age_subgroup & !sex_subgroup){
+#       fit <- MASS::glm.nb(deaths ~ treatment + age_group + sex + stunted +
+#                             log(distance) + wealth_quintile + season + 
+#                             offset(log_offset), data = data)
+#     }
+#     
+#   } else {
+#     # Unadjusted analysis
+#     fit <- MASS::glm.nb(deaths ~ treatment + offset(log_offset), 
+#                         data = data)
+#   }
+#   
+#   # Get clustered variance-covariance matrix
+#   cluster_vcov <- sandwich::vcovCL(fit, cluster = data$cluster_id, type = "HC1")
+#   
+#   # Extract treatment effect and clustered SE
+#   coef <- coef(fit)["treatment"]
+#   se <- sqrt(cluster_vcov["treatment", "treatment"])
+#   
+#   
+#   #get risk difference
+#   # Get predicted rates under treatment and control
+#   newdata0 <- newdata1 <- data
+#   newdata0$treatment <- 0
+#   newdata1$treatment <- 1
+#   
+#   # Predict rates and transform to natural scale
+#   pred0 <- predict(fit, newdata = newdata0, type = "response")
+#   pred1 <- predict(fit, newdata = newdata1, type = "response")
+#   
+#   # Calculate rate difference (per 1000 person-years)
+#   rd <- mean((pred1 - pred0)/exp(data$log_offset)) * 1000
+#   
+#   # Get SE using delta method
+#   X0 <- model.matrix(~ treatment + age_group + sex + stunted +
+#                        log(distance) + wealth_quintile + season, 
+#                      data = newdata0)
+#   X1 <- model.matrix(~ treatment + age_group + sex + stunted +
+#                        log(distance) + wealth_quintile + season, 
+#                      data = newdata1)
+#   
+#   # Get clustered variance matrix
+#   vcov_cluster <- sandwich::vcovCL(fit, cluster = data$cluster_id)
+#   
+#   # Calculate SE using delta method
+#   delta <- colMeans((X1 - X0)/exp(data$log_offset)) * 1000
+#   se_rd <- sqrt(t(delta) %*% vcov_cluster %*% delta)
+#   
+#   return(c(coef = coef, se = se, rd=rd, se_rd=se_rd))
+# }
+
+
+
+analyze_trial_data <- function(data, 
+                              subgroup = NULL,     # "age_group", "sex", or NULL
+                              subgroup_level = NULL, # specific level for subgroup
+                              adjusted = TRUE,
+                              run_tmle=FALSE) {
   
-  # Fit model
-  if(adjusted){
-    # Adjusted analysis
-    if(age_subgroup){
-      fit <- MASS::glm.nb(deaths ~ treatment + sex + stunted +
-                            log(distance) + wealth_quintile + season + 
-                            offset(log_offset), data = data)
-    }
-    if(sex_subgroup){
-      fit <- MASS::glm.nb(deaths ~ treatment + age_group  + stunted +
-                            log(distance) + wealth_quintile + season + 
-                            offset(log_offset), data = data)
-    }
-    
-    if(!age_subgroup & !sex_subgroup){
-      fit <- MASS::glm.nb(deaths ~ treatment + age_group + sex + stunted +
-                            log(distance) + wealth_quintile + season + 
-                            offset(log_offset), data = data)
-    }
-    
-  } else {
-    # Unadjusted analysis
-    fit <- MASS::glm.nb(deaths ~ treatment + offset(log_offset), 
-                        data = data)
+  # Filter for subgroup if specified
+  if(!is.null(subgroup) && !is.null(subgroup_level)) {
+    data <- data[data[[subgroup]] == subgroup_level,]
   }
   
-  # Get clustered variance-covariance matrix
-  cluster_vcov <- sandwich::vcovCL(fit, cluster = data$cluster_id, type = "HC1")
+  # Define adjustment variables based on subgroup
+  if(adjusted){
+    
+    data$log_distance <- log(data$distance)
+    
+    if(is.null(subgroup)){
+      adjust_vars <- c("age_group", "sex", "stunted", "log_distance", 
+                       "wealth_quintile", "season")
+    }else{
+      
+      if(subgroup == "age_group"){
+        adjust_vars <- c("sex", "stunted", "log_distance", 
+                         "wealth_quintile", "season")} 
+      if(subgroup == "sex"){
+        adjust_vars <- c("age_group", "stunted", "log_distance", 
+                         "wealth_quintile", "season")} 
+    }
+  }else{
+    adjust_vars <- NULL
+  }
   
-  # Extract treatment effect and clustered SE
-  coef <- coef(fit)["treatment"]
-  se <- sqrt(cluster_vcov["treatment", "treatment"])
+  # 1. Cox Model for Hazard Ratio
+  hr_formula <- if(adjusted) {
+    as.formula(paste("Surv(time, status) ~ treatment +", 
+                     paste(adjust_vars, collapse = " + "),
+                     "+ cluster(cluster_id)"))
+  }else{
+    Surv(time, status) ~ treatment# + cluster(cluster_id)
+  }
   
-  return(c(coef = coef, se = se))
+  cox_fit <- survival::coxph(hr_formula, data = data)
+  
+  # Get robust standard errors
+  try(vcov_robust_hr <- vcovCL(cox_fit, cluster = data$cluster_id, type = "HC1"))
+
+  # Extract results
+  coef_hr <- coef(cox_fit)["treatment"]
+  se_hr =NA
+  try(se_hr <- sqrt(vcov_robust_hr["treatment", "treatment"]))
+  hr_pval=NA
+  try(hr_pval <- summary(cox_fit)$coefficients["treatment", 6])
+  
+  # # 4. Incidence Rate Ratio using Poisson GEE with offset
+  # irr_formula <- if(adjusted) {
+  #   as.formula(paste("dead ~ treatment +", 
+  #                    paste(adjust_vars, collapse = " + "),
+  #                    "+ offset(log_offset)"))
+  # } else {
+  #   dead ~ treatment + offset(log_offset)
+  # }
+  
+  #5 CIR
+  cir_formula <- if(adjusted) {
+    as.formula(paste("dead ~ treatment +", 
+                     paste(adjust_vars, collapse = " + ")))
+  } else {
+    dead ~ treatment 
+  }
+  
+  
+  fit_cir <- glm(as.formula(cir_formula),
+                 family = poisson(link = "log"),
+                 data = data)
+  
+  # Get robust standard errors
+  vcov_robust_cir <- vcovCL(fit_cir, cluster = data$cluster_id, type = "HC1")
+  
+  # Extract results
+  coef_cir <- coef(fit_cir)["treatment"]
+  se_cir <- sqrt(vcov_robust_cir["treatment", "treatment"])
+  
+  
+  #6 CID
+  fit_cid <- glm(as.formula(cir_formula), family = "gaussian", data = data)
+  
+  # Get robust standard errors
+  vcov_robust_cid <- vcovCL(fit_cid, cluster = data$cluster_id, type = "HC1")
+  
+  # Extract results
+  coef_cid <- coef(fit_cid)["treatment"]
+  se_cid <- sqrt(vcov_robust_cid["treatment", "treatment"])
+  
+  res = data.frame(
+    hr=coef_hr,
+    hr_se=se_hr,
+    hr_ci_lb=coef_hr - 1.96*se_hr,
+    hr_ci_ub=coef_hr + 1.96*se_hr,
+    hr_pval=hr_pval,
+    cir=coef_cir,
+    cir_se=se_cir,
+    cir_ci_lb=coef_cir - 1.96*se_cir,
+    cir_ci_ub=coef_cir + 1.96*se_cir,
+    cir_pval=summary(fit_cir)$coefficients["treatment", 4],
+    cid=coef_cid,
+    cid_se=se_cid,
+    cid_ci_lb=coef_cid - 1.96*se_cid,
+    cid_ci_ub=coef_cid + 1.96*se_cid,
+    cid_pval=summary(fit_cid)$coefficients["treatment", 4]
+  )
+  
+  #tmle estimates
+  if(run_tmle){
+    
+    if(is.null(adjust_vars)){
+      Wdf=NULL
+    }else{
+      Wdf=data.frame(W1=rep(1, nrow(data)), W2=rep(1, nrow(data)))
+    }
+    
+    
+    
+    tmle_fit <- tmle::tmle(
+      A = data$treatment,
+      Y = data$dead,
+      W = Wdf,
+      id= data$cluster_id,
+      family = "binomial",
+      g.SL.library = c("SL.glm"),
+      Q.SL.library = c("SL.glm"),
+      g.Delta.SL.library = c("SL.glm"),  
+      V.Q = 5, V.g = 5, V.Delta = 5, V.Z = 5,
+      alpha = 0.05,
+      verbose = FALSE
+    )
+    
+    tmle_results <- summary(tmle_fit)$estimates
+    tmle_res = data.frame(tmle_rr=tmle_results$RR$psi, 
+                          tmle_log_rr=tmle_results$RR$log.psi, 
+                          tmle_rr_log_se=sqrt(tmle_results$RR$var.log.psi),
+                          tmle_rr_ci_lb=tmle_results$RR$CI[1],
+                          tmle_rr_ci_ub=tmle_results$RR$CI[2],
+                          tmle_rr_pval=tmle_results$RR$pvalue,
+                          tmle_ate=tmle_results$ATE$psi,
+                          tmle_ate_se=sqrt(tmle_results$ATE$var.psi),
+                          tmle_ate_ci_lb=tmle_results$ATE$CI[1],
+                          tmle_ate_ci_ub=tmle_results$ATE$CI[2],
+                          tmle_ate_pval=tmle_results$ATE$pvalue
+    )
+    tmle_res
+    
+    res = bind_cols(res, tmle_res)
+  }
+  
+  
+  # Add crude rates for context
+  crude_rates <- with(data, {
+    # Treatment group
+    rate1 <- sum(status[treatment == 1]) / sum(person_time[treatment == 1])
+    rate0 <- sum(status[treatment == 0]) / sum(person_time[treatment == 0])
+    
+    data.frame(
+      treated_rate = rate1 * 1000,    # per 1000 person-years
+      control_rate = rate0 * 1000,
+      crude_rr = rate1/rate0
+    )
+  })
+  
+  
+  res = bind_cols(crude_rates, res)
+  
+  return(res)
 }

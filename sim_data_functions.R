@@ -1,6 +1,14 @@
 
-
-
+# params = study_params$MORDOR_Niger
+# n_clusters = params$n_clusters
+# cluster_size = params$cluster_size
+# baseline_rate = params$baseline_rate
+# effect_size = params$effect_size
+# cv = params$cv
+# study_duration = 2  
+# loss_rate = 0.10 
+# study_name = "MORDOR_Niger"
+# region = "rural"
 
 #-------------------------------------------------------------------------------
 # Data sim function
@@ -16,11 +24,11 @@ simulate_trial_data <- function(
     loss_rate = 0.10,    
     study_name,
     region = "rural",
-    # New interaction effect parameters
-    age_interaction = 0.2,     # Stronger effect in younger children
-    distance_interaction = 0.1, # Stronger effect in remote areas
-    wealth_interaction = -0.1,  # Weaker effect in wealthy households
-    season_interaction = 0.15,   # Stronger effect in wet season
+    # # New interaction effect parameters -manually programmed-need to update
+    # age_interaction = 0.2,     # Stronger effect in younger children
+    # distance_interaction = 0.1, # Stronger effect in remote areas
+    # wealth_interaction = -0.1,  # Weaker effect in wealthy households
+    # season_interaction = 0.15,   # Stronger effect in wet season
     A=NULL
 ){
   
@@ -50,8 +58,35 @@ simulate_trial_data <- function(
   # Add covariates
   data <- cbind(data, covariates)
   
-  # Calculate covariate effects on log mortality rate
-  log_rate <- with(data, {
+  # Define relative effect modifications (will be scaled)
+  effect_mods <- with(data, {
+    # Age effects (relative to 24-59mo)
+    age_mod <- case_when(
+      age_group == "1-5mo"  ~ 1.5,    # 50% stronger effect
+      age_group == "6-11mo" ~ 1.3,    # 30% stronger effect
+      age_group == "12-23mo" ~ 1.1,   # 10% stronger effect
+      TRUE ~ 1.0                      # Reference group
+    )
+    
+    # Sex effect
+    sex_mod <- ifelse(sex == 1, 1.1, 1.0)  # 10% stronger in males
+    
+    # Distance effect (standardize to mean 1)
+    dist_mod <- log(distance)/mean(log(distance))
+    dist_mod <- 1 + 0.2 * (dist_mod - 1)  # 20% variation by distance
+    
+    # Multiply modifications together
+    total_mod <- age_mod * sex_mod * dist_mod
+    
+    # Scale to maintain overall effect
+    scale_factor <- mean(total_mod)
+    total_mod/scale_factor
+  })
+  
+
+  
+  # Calculate covariate effects on log hazard
+  log_hazard  <- with(data, {
     # Base rate
     log(baseline_rate) +
       
@@ -80,40 +115,38 @@ simulate_trial_data <- function(
       # Season effect
       0.2 * season +                    
       
-      # Treatment main effect
-      log(effect_size) * treatment +
+      # Treatment  effect with interactions
+      log(effect_size) * treatment * effect_mods +
       
-      # Treatment interactions
-      treatment * (
-        # Age interaction (stronger effect in younger)
-        age_interaction * ((age_group == "1-5mo") + 
-                             0.75 * (age_group == "6-11mo") +
-                             0.5 * (age_group == "12-23mo")) #+
-          
-          # # Distance interaction (stronger effect with distance)
-          # distance_interaction * (log(distance) - mean(log(distance))) +
-          # 
-          # # Wealth interaction (weaker effect in wealthy)
-          # wealth_interaction * (as.numeric(wealth_quintile) - 3) +
-          # 
-          # # Season interaction (stronger in wet season)
-          # season_interaction * season
-      ) +
       
       # Cluster effect
       cluster_effect
   })
   
-  # Generate observed person-time accounting for loss to follow-up
-  followup_time <- rexp(n_total, rate = loss_rate)
-  followup_time[followup_time > study_duration] <- study_duration
-  data$log_offset <- log(followup_time)
+  # Generate survival times from exponential distribution
+  hazard <- exp(log_hazard)
+  data$survival_time <- rexp(nrow(data), rate = hazard)
   
-  # Generate death counts
-  lambda <- exp(log_rate + data$log_offset)
-  phi <- cv^2  
-  data$deaths <- rnbinom(n_total, mu = lambda, size = 1/phi)
+  # Generate censoring times
+  data$censoring_time <- rexp(nrow(data), rate = loss_rate)
   
+  # Calculate observed time and status
+  data$time <- pmin(data$survival_time, data$censoring_time, study_duration)
+  data$status <- as.numeric(data$survival_time <= pmin(data$censoring_time, study_duration))
+  
+  # Add time periods for time-varying analysis if needed
+  data$period <- cut(data$time, 
+                     breaks = seq(0, study_duration, by = 0.5),  # 6-month intervals
+                     labels = FALSE)
+  
+  # Calculate person-time for rate calculations
+  data$person_time <- data$time
+  data$log_offset <- log(data$person_time)
+  
+  # For compatibility with existing code, add deaths column
+  data$dead <- data$status
+  #mean(data$deaths)
+    
   return(data)
 }
 
@@ -219,6 +252,25 @@ generate_covariates <- function(n, region="rural") {
   )
 }
 
+
+
+check_simulated_variation <- function(sim_data) {
+  # Calculate empirical CVs from simulated data
+  empirical_cvs <- by(sim_data, sim_data$study, function(x) {
+    # Calculate CV of mortality rates
+    rates <- x$deaths/exp(x$log_offset)
+    sd(rates)/mean(rates)
+  })
+  
+  # Compare to input CVs
+  cv_comparison <- data.frame(
+    study = names(study_params),
+    input_cv = sapply(study_params, `[[`, "cv"),
+    simulated_cv = as.numeric(empirical_cvs)
+  )
+  
+  return(cv_comparison)
+}
 
 
 

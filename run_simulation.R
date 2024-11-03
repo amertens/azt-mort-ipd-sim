@@ -14,10 +14,8 @@ source("study_params.R")
 
 # simulation parameters
 full_res = NULL
-n_analyses = 7  # Main + 4 age groups + 2 sex groups
 iter_df =NULL
-iter_range=c(7,1000)
-meta_method="REML"
+iter_range=c(1,1000)
 
 sim=1
 
@@ -38,37 +36,19 @@ for(sim in iter_range[1]:iter_range[2]){
           study_name = study_name
         )
       }))
+      prop.table(table(sim_study_data$dead))*100
       
       # Test for interactions
       #interaction_results[[sim]] <- lapply(split(sim_study_data, sim_data$study), test_interactions)
       # interaction_results <- lapply(split(sim_study_data, sim_study_data$study), test_interactions)
       # head(interaction_results)
 
+      # Run analyses
+      results <- run_analysis(studies_data=sim_study_data, adjusted=TRUE, run_tmle=TRUE)
       
-      # Run meta-analyses
-      results_list  <- meta_analyze_subgroups(sim_study_data, method=meta_method)
-      meta_results <- results_list[[1]]
-      study_results <- results_list[[2]]
+      results$iteration = sim
       
-      pooled_res <- NULL
-      for(j in seq_along(meta_results)) {
-        if(!is.null(meta_results[[j]])) {
-          res <- data.frame(
-            effect = exp(meta_results[[j]]$b[1]),
-            se = sqrt(meta_results[[j]]$vb[1,1]),
-            tau2 = meta_results[[j]]$tau2,
-            pvalue = meta_results[[j]]$pval
-          )
-          res$group <- names(meta_results)[j]
-        }
-        pooled_res <- bind_rows(pooled_res, res)
-      }
-      pooled_res$study="pooled"
-      
-      res=bind_rows(pooled_res, study_results)
-      res$iteration = sim
-      
-      full_res=bind_rows(full_res, res)
+      full_res=bind_rows(full_res, results)
       
       # Save and print progress
       saveRDS(full_res, file=here("results/sim_results_interim.rds"))
