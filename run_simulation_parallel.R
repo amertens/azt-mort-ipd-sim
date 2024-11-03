@@ -70,7 +70,7 @@ clusterEvalQ(cl,lapply(c("tmle","data.table","tidyverse","survival","lme4","sand
 
 full_res=NULL
 #for(i in iter_range[1]:(iter_range[2]/n_cores)){
-for(i in 3:20){
+for(i in 1:20){
   cat(i,"\n")
   res=parLapply(cl=cl, c(((i-1)*50+1):(50*i)), function(z) run_sim_par(full_res = NULL,
                                                         sim =z,
@@ -85,16 +85,6 @@ for(i in 3:20){
 saveRDS(full_res, file=here("results/sim_results_par.rds"))
 stopCluster(cl)
 
-
-
-
-
-# simulation parameters
-full_res = NULL
-iter_df =NULL
-iter_range=c(1,1000)
-
-sim=1
 
 
 

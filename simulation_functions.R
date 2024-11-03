@@ -435,7 +435,7 @@ analyze_trial_data <- function(data,
       Wdf=data.frame(W1=rep(1, nrow(data)), W2=rep(1, nrow(data)))
     }
     
-    
+    SL.lib = c("SL.glm","SL.glmnet","SL.ranger")
     
     tmle_fit <- tmle::tmle(
       A = data$treatment,
@@ -443,9 +443,9 @@ analyze_trial_data <- function(data,
       W = Wdf,
       id= data$cluster_id,
       family = "binomial",
-      g.SL.library = c("SL.glm"),
-      Q.SL.library = c("SL.glm"),
-      g.Delta.SL.library = c("SL.glm"),  
+      g.SL.library = SL.lib,
+      Q.SL.library = SL.lib,
+      g.Delta.SL.library = SL.lib,  
       V.Q = 5, V.g = 5, V.Delta = 5, V.Z = 5,
       alpha = 0.05,
       verbose = FALSE
