@@ -58,7 +58,7 @@ clusterExport(cl, c("run_sim_par","study_params","simulate_trial_data","generate
                     "run_analysis","analyze_subgroups","analyze_trial_data","iter_range"), envir=environment())
 
 
-clusterEvalQ(cl,lapply(c("tmle","data.table","tidyverse","survival","lme4","sandwich","here"), FUN = function(X) {
+clusterEvalQ(cl,lapply(c("tmle","data.table","tidyverse","survival","lme4","sandwich","here","ranger"), FUN = function(X) {
   do.call("require", list(X))
 }))
 
@@ -70,7 +70,7 @@ clusterEvalQ(cl,lapply(c("tmle","data.table","tidyverse","survival","lme4","sand
 
 full_res=NULL
 #for(i in iter_range[1]:(iter_range[2]/n_cores)){
-for(i in 1:20){
+for(i in 9:23){
   cat(i,"\n")
   res=parLapply(cl=cl, c(((i-1)*50+1):(50*i)), function(z) run_sim_par(full_res = NULL,
                                                         sim =z,
@@ -81,6 +81,7 @@ for(i in 1:20){
   saveRDS(full_res, file=here("results/sim_results_interim_par.rds"))
 }
 
+length(unique(full_res$iteration))
 
 saveRDS(full_res, file=here("results/sim_results_par.rds"))
 stopCluster(cl)
