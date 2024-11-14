@@ -1,0 +1,45 @@
+---
+title: "analysis plan section"
+author: "Andrew Mertens"
+date: "2024-11-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+|Study | Clusters (n) | Cluster Size | Baseline Rate | Effect Size (RR) | CV | 
+| ——- | ————- | ————– | ————— | —————— | —– | 
+| MORDOR Niger | 297 | 141 | 0.0275 | 0.819 | 0.34 | 
+| MORDOR Malawi | 152 | 226 | 0.0096 | 0.943 | 0.34 | 
+| MORDOR Tanzania | 307 | 64 | 0.0055 | 0.966 | 0.34 | 
+| MORDOR II Niger | 594 | 131 | 0.0263 | 0.840 | 0.044 | 
+| TANA I | 50 | 87 | 0.0083 | 0.490 | 0.232 | 
+| AVENIR | 463 | 105 | 0.0139 | 0.860 | 0.032 | 
+| PRET biannual | 24 | 118 | 0.0290 | 0.810 | 0.150 |
+
+
+
+# ```{r, results='asis'}
+# 
+# |Study | Clusters (n) | Cluster Size | Baseline Rate | Effect Size (RR) | CV | 
+# | ——- | ————- | ————– | ————— | —————— | —– | 
+#   | MORDOR Niger | 297 | 141 | 0.0275 | 0.819 | 0.34 | 
+#   | MORDOR Malawi | 152 | 226 | 0.0096 | 0.943 | 0.34 | 
+#   | MORDOR Tanzania | 307 | 64 | 0.0055 | 0.966 | 0.34 | 
+#   | MORDOR II Niger | 594 | 131 | 0.0263 | 0.840 | 0.044 | 
+#   | TANA I | 50 | 87 | 0.0083 | 0.490 | 0.232 | 
+#   | AVENIR | 463 | 105 | 0.0139 | 0.860 | 0.032 | 
+#   | PRET biannual | 24 | 118 | 0.0290 | 0.810 | 0.150 |
+# 
+# ```
