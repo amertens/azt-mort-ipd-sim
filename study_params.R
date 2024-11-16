@@ -29,14 +29,6 @@ study_params <- list(
     cv = 0.34                # Using Niger CV as not reported
   ),
   
-  MORDOR_II_Niger = list(
-    n_clusters = 594,
-    cluster_size = floor(119*loss_rate_correction),
-    baseline_rate = 0.0263,  # 26.3 deaths per 1000 person-years
-    effect_size = 0.84,      # 16% reduction in year 1
-    cv = 0.044               # Back-calculated CV
-  ),
-  
   TANA_I = list(
     n_clusters = 50,
     cluster_size = floor(79*loss_rate_correction),
@@ -60,5 +52,12 @@ study_params <- list(
     baseline_rate = 0.0290,  # 29.0 deaths per 1000 person-years
     effect_size = 0.81,      # From reported IRR
     cv = 0.15                # Using same as annual arm
+  ),
+  CHAT = list(
+    n_clusters = 341,        # Total communities randomized per Fig 1
+    cluster_size = floor(75*loss_rate_correction),    # Mean child population per cluster ~75 based on Table 1 "median [IQR]" children per community of 146 [85-210] and ~50% being <5 years 
+    baseline_rate = 0.010,   # Control group had 10.0 deaths per 1000 person-years
+    effect_size = 0.82,      # IRR 0.82 (95% CI: 0.67-1.02) 
+    cv = 0.55                # "The observed coefficient of variation for cluster-level mortality rates was 0.55"
   )
 )

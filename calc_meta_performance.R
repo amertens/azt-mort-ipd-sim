@@ -11,36 +11,14 @@ library(doParallel)
 source("sim_data_functions.R")
 source("study_params.R")
 
-truth <- readRDS(here("results/truth.rds"))
-study_results <- readRDS(file=here("results/sim_results_interim_par.rds"))
-length(unique(study_results$iteration))
-#NOTE! Need to add in unadjusted results
+truth_FE <- readRDS(here("results/meta_truth_FE.rds"))
+truth_RE <- readRDS(here("results/meta_truth_RE.rds"))
 
-colnames(study_results)
+pooled_results_RE <- readRDS(file=here("results/pooled_results_RE.rds"))
+pooled_results_FE <- readRDS(file=here("results/pooled_results_FE.rds"))
 
-#transform data to long format with columns for effect and se, and the group
-study_result_est <- study_results %>% 
-  mutate(crude_rr = log(crude_rr)) %>% #make sure all ratios are on the log scale
-  select(iteration, study, group, level, crude_rr, hr, cid, cir, tmle_log_rr, tmle_ate) %>%
-  gather(key="metric", value="effect", -iteration, -study, -group, -level) %>% distinct()
-
-study_result_se <- study_results %>% 
-  select(iteration, study, group, level, hr_se, cid_se, cir_se, tmle_rr_log_se, tmle_ate_se) %>%
-  gather(key="metric", value="se", -iteration, -study, -group, -level) %>%
-  mutate(metric = gsub("_se", "", metric)) %>% distinct()
-
-study_result_pval <- study_results %>% 
-  select(iteration, study, group, level, hr_pval,  cir_pval, cid_pval, tmle_rr_pval, tmle_ate_pval) %>%
-  gather(key="metric", value="pval", -iteration, -study, -group, -level) %>%
-  mutate(metric = gsub("_pval", "", metric)) %>% distinct()
-
-study_results <- left_join(study_result_est, study_result_se, by=c("iteration", "study", "group", "level", "metric"))
-study_results <- left_join(study_results, study_result_pval, by=c("iteration", "study", "group", "level", "metric"))
-study_results <- study_results %>% mutate(lower=effect-1.96*se, upper=effect+1.96*se)
-
-#join with truth
-table(study_results$metric)
-table(truth$metric)
+truth<-truth_FE
+results_FE <- pooled_results_FE
 
 truth <- truth %>% mutate(true_value = case_when(
   metric %in% c("cid", "ird") ~ true_value,
@@ -54,22 +32,22 @@ truth_tmle <- truth %>% mutate(metric=case_when(
 )) %>% filter(!is.na(metric))
 truth <- bind_rows(truth, truth_tmle)
 
-table(study_results$study)
-table(study_results$group)
-table(study_results$level)
-table(study_results$metric)
+table(results_FE$group)
+table(results_FE$level)
+table(results_FE$metric)
 table(truth$study)
 table(truth$group)
 table(truth$metric)
 
-d <- left_join(study_results, truth, by=c("study", "level", "metric"))
+d <- left_join(results_FE, truth, by=c("level", "metric"))
 table(d$metric,!is.na(d$true_value))
 table(d$level,!is.na(d$true_value))
 # Calculate performance metrics
 tail(d)
 
 summary( d$effect[d$metric=="tmle_log_rr"] )
-truth
+summary( d$effect[d$metric=="cid"] )
+
 
 res <- d %>% group_by(study,level, metric) %>%
   summarise(n=n(),
@@ -85,6 +63,12 @@ head(res)
 #temp drop HR
 res <- res %>% filter(metric!="hr", metric!="crude_rr")
 
+#-------------------------------------------------------------------------------
+# get meta-analysis performance
+#-------------------------------------------------------------------------------
+
+#XXXXXXXXXXXXXXXXXXX
+#Add
 
 
 #-------------------------------------------------------------------------------
@@ -103,16 +87,7 @@ ggplot(resRR_study_long %>% filter(level=="main"),
   facet_wrap(~performance_metric, scales="free") +
   theme_minimal()
 
-temp <- resRR_study_long %>% filter(level=="main", metric %in% c("cid","tmle_ate"))
-
 ggplot(resRR_study_long %>% filter(level=="main", metric %in% c("cid","tmle_ate")),
-       aes(x=study, y=value, color=metric  , shape=metric  )) +
-  coord_flip() +
-  geom_point(position = position_dodge(0.5)) +
-  facet_wrap(~performance_metric, scales="free") +
-  theme_minimal()
-
-ggplot(resRR_study_long %>% filter(level=="main", !(metric %in% c("cid","tmle_ate"))),
        aes(x=study, y=value, color=metric  , shape=metric  )) +
   coord_flip() +
   geom_point(position = position_dodge(0.5)) +
