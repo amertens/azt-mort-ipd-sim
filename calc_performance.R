@@ -103,7 +103,16 @@ ggplot(resRR_study_long %>% filter(level=="main"),
   facet_wrap(~performance_metric, scales="free") +
   theme_minimal()
 
+temp <- resRR_study_long %>% filter(level=="main", metric %in% c("cid","tmle_ate"))
+
 ggplot(resRR_study_long %>% filter(level=="main", metric %in% c("cid","tmle_ate")),
+       aes(x=study, y=value, color=metric  , shape=metric  )) +
+  coord_flip() +
+  geom_point(position = position_dodge(0.5)) +
+  facet_wrap(~performance_metric, scales="free") +
+  theme_minimal()
+
+ggplot(resRR_study_long %>% filter(level=="main", !(metric %in% c("cid","tmle_ate"))),
        aes(x=study, y=value, color=metric  , shape=metric  )) +
   coord_flip() +
   geom_point(position = position_dodge(0.5)) +
