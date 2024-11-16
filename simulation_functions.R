@@ -435,9 +435,11 @@ analyze_trial_data <- function(data,
       Wdf=data.frame(W1=rep(1, nrow(data)), W2=rep(1, nrow(data)))
     }
     
-    SL.lib = c("SL.glm","SL.glmnet","SL.ranger")
+    #SL.lib = c("SL.glm","SL.glmnet","SL.ranger")
+    SL.lib = c("SL.glm","SL.glmnet","SL.step.interaction")
+    tmle_fit <- NULL
     
-    tmle_fit <- tmle::tmle(
+    try(tmle_fit <- tmle::tmle(
       A = data$treatment,
       Y = data$dead,
       W = Wdf,
@@ -449,23 +451,36 @@ analyze_trial_data <- function(data,
       V.Q = 5, V.g = 5, V.Delta = 5, V.Z = 5,
       alpha = 0.05,
       verbose = FALSE
-    )
-    
-    tmle_results <- summary(tmle_fit)$estimates
-    tmle_res = data.frame(tmle_rr=tmle_results$RR$psi, 
-                          tmle_log_rr=tmle_results$RR$log.psi, 
-                          tmle_rr_log_se=sqrt(tmle_results$RR$var.log.psi),
-                          tmle_rr_ci_lb=tmle_results$RR$CI[1],
-                          tmle_rr_ci_ub=tmle_results$RR$CI[2],
-                          tmle_rr_pval=tmle_results$RR$pvalue,
-                          tmle_ate=tmle_results$ATE$psi,
-                          tmle_ate_se=sqrt(tmle_results$ATE$var.psi),
-                          tmle_ate_ci_lb=tmle_results$ATE$CI[1],
-                          tmle_ate_ci_ub=tmle_results$ATE$CI[2],
-                          tmle_ate_pval=tmle_results$ATE$pvalue
-    )
-    tmle_res
-    
+    ))
+    if(!is.null(tmle_fit)){
+      tmle_results <- summary(tmle_fit)$estimates
+      tmle_res = data.frame(tmle_rr=tmle_results$RR$psi, 
+                            tmle_log_rr=tmle_results$RR$log.psi, 
+                            tmle_rr_log_se=sqrt(tmle_results$RR$var.log.psi),
+                            tmle_rr_ci_lb=tmle_results$RR$CI[1],
+                            tmle_rr_ci_ub=tmle_results$RR$CI[2],
+                            tmle_rr_pval=tmle_results$RR$pvalue,
+                            tmle_ate=tmle_results$ATE$psi,
+                            tmle_ate_se=sqrt(tmle_results$ATE$var.psi),
+                            tmle_ate_ci_lb=tmle_results$ATE$CI[1],
+                            tmle_ate_ci_ub=tmle_results$ATE$CI[2],
+                            tmle_ate_pval=tmle_results$ATE$pvalue
+      )
+    }else{
+      tmle_results <- summary(tmle_fit)$estimates
+      tmle_res = data.frame(tmle_rr=NA, 
+                            tmle_log_rr=NA, 
+                            tmle_rr_log_se=NA,
+                            tmle_rr_ci_lb=NA,
+                            tmle_rr_ci_ub=NA,
+                            tmle_rr_pval=NA,
+                            tmle_ate=NA,
+                            tmle_ate_se=NA,
+                            tmle_ate_ci_lb=NA,
+                            tmle_ate_ci_ub=NA,
+                            tmle_ate_pval=NA)
+    }
+
     res = bind_cols(res, tmle_res)
   }
   
