@@ -73,7 +73,7 @@ full_res=NULL
 # max(full_res$iteration)/50
 
 #for(i in iter_range[1]:(iter_range[2]/n_cores)){
-for(i in 4:20){
+for(i in 1:20){
   cat(i,"\n")
   res=parLapply(cl=cl, c(((i-1)*50+1):(50*i)), function(z) run_sim_par(full_res = NULL,
                                                         sim =z,
