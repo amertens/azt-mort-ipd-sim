@@ -436,7 +436,9 @@ analyze_trial_data <- function(data,
     }
     
     #SL.lib = c("SL.glm","SL.glmnet","SL.ranger")
-    SL.lib = c("SL.glm","SL.step.interaction")
+    #SL.lib = c("SL.mean","SL.glm","SL.biglasso","SL.ranger")
+    SL.lib = c("SL.mean","SL.glm","SL.ranger")
+    
     tmle_fit <- NULL
     
     try(tmle_fit <- tmle::tmle(
