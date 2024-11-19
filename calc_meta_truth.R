@@ -11,6 +11,7 @@ source("study_params.R")
 
 #---------------------------------------------------------------------------
 # Notes on truth calculation
+#---------------------------------------------------------------------------
 
 #For the fixed effect meta-analysis, need to increase the sample size of all studies, 
 #keeping the relative sizes the same. (how do I change clusters number versus cluster size?)
@@ -25,18 +26,19 @@ source("study_params.R")
 
 study_params_RE <- study_params_FE <- study_params
 
-study_params_RE$AVENIR$n_clusters <- 1000
-study_params_RE$AVENIR$cluster_size <- 1000
-study_params_RE$MORDOR_Niger$n_clusters <- 1000
-study_params_RE$MORDOR_Niger$cluster_size <- 1000
-study_params_RE$MORDOR_Malawi$n_clusters <- 1000
-study_params_RE$MORDOR_Malawi$cluster_size <- 1000
-study_params_RE$MORDOR_Tanzania$n_clusters <- 1000
-study_params_RE$MORDOR_Tanzania$cluster_size <- 1000
-study_params_RE$MORDOR_II_Niger$n_clusters <- 1000
-study_params_RE$MORDOR_II_Niger$cluster_size <- 1000
-study_params_RE$TANA_I$n_clusters <- 1000
-study_params_RE$TANA_I$cluster_size <- 1000
+study_params$AVENIR$n_clusters <- 1000
+study_params$AVENIR$cluster_size <- 1000
+study_params$MORDOR_Niger$n_clusters <- 1000
+study_params$MORDOR_Niger$cluster_size <- 1000
+study_params$MORDOR_Malawi$n_clusters <- 1000
+study_params$MORDOR_Malawi$cluster_size <- 1000
+study_params$MORDOR_Tanzania$n_clusters <- 1000
+study_params$MORDOR_Tanzania$cluster_size <- 1000
+study_params$CHAT$n_clusters <- 1000
+study_params$CHAT$cluster_size <- 1000
+study_params$TANA_I$n_clusters <- 1000
+study_params$TANA_I$cluster_size <- 1000
+
 
 #increase size of fixed effect studies
 mult_factor_n_clusters = 1
@@ -49,8 +51,8 @@ study_params_FE$MORDOR_Malawi$n_clusters <- study_params_FE$MORDOR_Malawi$n_clus
 study_params_FE$MORDOR_Malawi$cluster_size <- study_params_FE$MORDOR_Malawi$cluster_size *mult_factor_cluster_size
 study_params_FE$MORDOR_Tanzania$n_clusters <- study_params_FE$MORDOR_Tanzania$n_clusters *mult_factor_n_clusters
 study_params_FE$MORDOR_Tanzania$cluster_size <- study_params_FE$MORDOR_Tanzania$cluster_size *mult_factor_cluster_size
-study_params_FE$MORDOR_II_Niger$n_clusters <- study_params_FE$MORDOR_II_Niger$n_clusters *mult_factor_n_clusters
-study_params_FE$MORDOR_II_Niger$cluster_size <- study_params_FE$MORDOR_II_Niger$cluster_size *mult_factor_cluster_size
+study_params_FE$CHAT$n_clusters <- study_params_FE$CHAT$n_clusters *mult_factor_n_clusters
+study_params_FE$CHAT$cluster_size <- study_params_FE$CHAT$cluster_size *mult_factor_cluster_size
 study_params_FE$TANA_I$n_clusters <- study_params_FE$TANA_I$n_clusters *mult_factor_n_clusters
 study_params_FE$TANA_I$cluster_size <- study_params_FE$TANA_I$cluster_size *mult_factor_cluster_size
 

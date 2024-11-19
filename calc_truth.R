@@ -13,6 +13,7 @@ source("study_params.R")
 # make large sample size
 #---------------------------------------------------------------------------
 
+names(study_params)
 study_params$AVENIR$n_clusters <- 1000
 study_params$AVENIR$cluster_size <- 1000
 study_params$MORDOR_Niger$n_clusters <- 1000
@@ -21,8 +22,8 @@ study_params$MORDOR_Malawi$n_clusters <- 1000
 study_params$MORDOR_Malawi$cluster_size <- 1000
 study_params$MORDOR_Tanzania$n_clusters <- 1000
 study_params$MORDOR_Tanzania$cluster_size <- 1000
-study_params$MORDOR_II_Niger$n_clusters <- 1000
-study_params$MORDOR_II_Niger$cluster_size <- 1000
+study_params$CHAT$n_clusters <- 1000
+study_params$CHAT$cluster_size <- 1000
 study_params$TANA_I$n_clusters <- 1000
 study_params$TANA_I$cluster_size <- 1000
 
@@ -31,6 +32,8 @@ study_params$TANA_I$cluster_size <- 1000
 # Generate counterfactual data
 #---------------------------------------------------------------------------
 
+study_name=""
+  
   set.seed(123456)
   # Generate data for all studies
   sim_study_data_A1 <- do.call(rbind, lapply(names(study_params), function(study_name) {

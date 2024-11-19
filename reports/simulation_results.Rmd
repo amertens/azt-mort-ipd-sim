@@ -1,0 +1,50 @@
+---
+title: "Simulation results"
+author: "Andrew Mertens"
+date: "2024-11-18"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+rm(list=ls())
+library(tidyverse)
+library(here)
+library(knitr)
+
+load(here("results/meta_performance.rdata"))
+
+       
+```
+
+#Write a paragraph here about the setup of the simulation in this repo:
+
+
+
+## Simulation results
+
+```{r}
+
+knitr::kable(tabRD_RE)
+knitr::kable(tabRR_RE)
+
+
+```
+
+## Plot results
+
+**Figure 1.** Performance metrics for the cumulative incidence difference across different subgroups pooled via random effects meta-analyses. The mean absolute bias,  mean variance, bias to standard error ratio, power, oracle coverage, and coverage are shown for each subgroup. The oracle coverage is the proportion of confidence intervals that contain the true value. The coverage is the proportion of confidence intervals that contain the true value where the confidence interval is constructed from the variance of the point estimates across the simulation iteractions. 
+
+```{r, echo=FALSE}
+ggplot(resRR_long ,
+         aes(x=level, y=value, color=metric, shape=metric  )) +
+  coord_flip() +
+  geom_point(position = position_dodge(0.5)) +
+  facet_wrap(~performance_metric, scales="free") +
+  theme_minimal() + theme(legend.position = c(0.8,0.25)) + 
+  guides(color=guide_legend(title="Estimator"), shape=guide_legend(title="Estimator"))
+
+```
+
+

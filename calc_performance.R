@@ -12,31 +12,9 @@ source("sim_data_functions.R")
 source("study_params.R")
 
 truth <- readRDS(here("results/truth.rds"))
-study_results <- readRDS(file=here("results/sim_results_interim_par.rds"))
-length(unique(study_results$iteration))
-#NOTE! Need to add in unadjusted results
+#study_results <- readRDS(file=here("results/sim_results_interim_par.rds"))
+study_results <- readRDS(here("results/sim_results_clean.rds"))
 
-colnames(study_results)
-
-#transform data to long format with columns for effect and se, and the group
-study_result_est <- study_results %>% 
-  mutate(crude_rr = log(crude_rr)) %>% #make sure all ratios are on the log scale
-  select(iteration, study, group, level, crude_rr, hr, cid, cir, tmle_log_rr, tmle_ate) %>%
-  gather(key="metric", value="effect", -iteration, -study, -group, -level) %>% distinct()
-
-study_result_se <- study_results %>% 
-  select(iteration, study, group, level, hr_se, cid_se, cir_se, tmle_rr_log_se, tmle_ate_se) %>%
-  gather(key="metric", value="se", -iteration, -study, -group, -level) %>%
-  mutate(metric = gsub("_se", "", metric)) %>% distinct()
-
-study_result_pval <- study_results %>% 
-  select(iteration, study, group, level, hr_pval,  cir_pval, cid_pval, tmle_rr_pval, tmle_ate_pval) %>%
-  gather(key="metric", value="pval", -iteration, -study, -group, -level) %>%
-  mutate(metric = gsub("_pval", "", metric)) %>% distinct()
-
-study_results <- left_join(study_result_est, study_result_se, by=c("iteration", "study", "group", "level", "metric"))
-study_results <- left_join(study_results, study_result_pval, by=c("iteration", "study", "group", "level", "metric"))
-study_results <- study_results %>% mutate(lower=effect-1.96*se, upper=effect+1.96*se)
 
 #join with truth
 table(study_results$metric)
@@ -71,13 +49,14 @@ tail(d)
 summary( d$effect[d$metric=="tmle_log_rr"] )
 truth
 
-res <- d %>% group_by(study,level, metric) %>%
+res <- d %>% group_by(study,level, metric, adjusted) %>%
   summarise(n=n(),
             true_value=true_value[1],
             abs_bias=mean(abs(effect - true_value)),
             estimator_variance=mean(((effect )-mean((effect )))^2),
             mean_variance=mean((se)^2),
             bias_se_ratio=abs_bias/sqrt(mean_variance),
+            power=mean((lower<0 & upper<0)|(lower>0 & upper>0))*100,
             coverage=mean(lower<=true_value & true_value<=upper)*100,
             O_coverage=mean(effect -1.96*sd(effect )< true_value & true_value < effect +1.96*sd(effect ))*100)
 head(res)
@@ -86,15 +65,28 @@ head(res)
 res <- res %>% filter(metric!="hr", metric!="crude_rr")
 
 
-
-#-------------------------------------------------------------------------------
-# plot_performance
-#-------------------------------------------------------------------------------
-
 #transform data to long format
 resRR_study_long <- res %>% 
-  select(level, metric, study,  abs_bias, estimator_variance, mean_variance, bias_se_ratio, coverage, O_coverage ) %>%
-  gather(key="performance_metric", value="value", -level, -metric,, -study)
+  select(level, metric, study, adjusted,  abs_bias, estimator_variance, mean_variance, bias_se_ratio, power, coverage, O_coverage ) %>%
+  gather(key="performance_metric", value="value", -level, -metric, -study)
+
+#-------------------------------------------------------------------------------
+# tabulate performance
+#-------------------------------------------------------------------------------
+tabRD <- resRR_study_long %>% filter(level=="main", metric %in% c("cid","tmle_ate")) %>% 
+  spread(key="performance_metric", value="value") %>% arrange(abs(O_coverage-95), bias_se_ratio )
+tabRD
+
+tabRR <- resRR_study_long %>% filter(level=="main", metric %in% c("cir","tmle_log_rr")) %>% 
+  spread(key="performance_metric", value="value") %>% arrange(abs(O_coverage-95), bias_se_ratio )
+tabRR
+
+
+#-------------------------------------------------------------------------------
+# plot performance
+#-------------------------------------------------------------------------------
+
+
 
 ggplot(resRR_study_long %>% filter(level=="main"),
          aes(x=study, y=value, color=metric  , shape=metric  )) +
