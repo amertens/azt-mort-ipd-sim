@@ -15,19 +15,38 @@ library(knitr)
 
 load(here("results/meta_performance.rdata"))
 
+clean_tab <- function(tab){
+  tab$abs_bias <- tab$abs_bias*1000
+  tab$mean_variance <- tab$mean_variance*1000
+  
+  tab$abs_bias <- round(tab$abs_bias, 2)
+  tab$mean_variance <- round(tab$mean_variance, 2)
+  tab$bias_se_ratio <- round(tab$bias_se_ratio, 2)
+  tab$O_coverage <- round(tab$O_coverage, 1)
+  tab$power <- round(tab$power, 1)
+  return(tab)
+}
+
+tabRD_RE <- clean_tab(tabRD_RE)
+tabRR_RE <- clean_tab(tabRR_RE)
+tabRR_RE <- clean_tab(res_RE_summarized)
        
+
 ```
 
 #Write a paragraph here about the setup of the simulation in this repo:
 
 
 
-## Simulation results
+## Simulation tables
+
+Note the bias and variance columns are multiplied by 1000 for readability
 
 ```{r}
 
 knitr::kable(tabRD_RE)
 knitr::kable(tabRR_RE)
+knitr::kable(res_RE_summarized)
 
 
 ```

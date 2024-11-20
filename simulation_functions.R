@@ -61,30 +61,36 @@ analyze_subgroups <- function(data, adjusted=TRUE, run_tmle=TRUE) {
 
 
 # Function to get all estimator and subgroup results
-run_analysis <- function(studies_data, adjusted=TRUE, run_tmle=TRUE) {
+run_analysis <- function(studies_data, adjusted=TRUE, run_tmle=TRUE, one_step=FALSE) {
 
   full_res=NULL
-  # Get subgroup results for each study
-  for(i in unique(studies_data$study)){
-    df <- studies_data %>% filter(study==i)
-    res=NULL
-    try(res <- analyze_subgroups(data=df, adjusted=adjusted, run_tmle=run_tmle))
-    full_res=bind_rows(full_res,res)
+  
+  if(one_step){
+    try(full_res <- analyze_subgroups(data=studies_data, adjusted=adjusted, run_tmle=run_tmle))
+    
+  }else{
+  
+    # Get subgroup results for each study
+    for(i in unique(studies_data$study)){
+      df <- studies_data %>% filter(study==i)
+      res=NULL
+      try(res <- analyze_subgroups(data=df, adjusted=adjusted, run_tmle=run_tmle))
+      full_res=bind_rows(full_res,res)
+    }
+    
+    #NEED TO DEBUG UNADJUSTED COX PH
+    
+    # res= studies_data %>% group_by(study) %>%
+    #   do(res=analyze_subgroups(data=., adjusted=adjusted, run_tmle=run_tmle))
+    # 
+    # full_res=NULL
+    # for(i in 1:length(res$res)){
+    #   temp=res$res[[i]]
+    #   temp$study=res$study[i]
+    #   full_res=bind_rows(full_res,temp)
+    # }     
   }
   
-  #NEED TO DEBUG UNADJUSTED COX PH
-  
-  res= studies_data %>% group_by(study) %>%
-    do(res=analyze_subgroups(data=., adjusted=adjusted, run_tmle=run_tmle))
-
-  full_res=NULL
-  for(i in 1:length(res$res)){
-    temp=res$res[[i]]
-    temp$study=res$study[i]
-    full_res=bind_rows(full_res,temp)
-  }
-  
-
   return(full_res)
 }
 
@@ -319,42 +325,43 @@ analyze_trial_data <- function(data,
                               subgroup = NULL,     # "age_group", "sex", or NULL
                               subgroup_level = NULL, # specific level for subgroup
                               adjusted = TRUE,
-                              run_tmle=FALSE) {
+                              run_tmle=FALSE){
   
   # Filter for subgroup if specified
   if(!is.null(subgroup) && !is.null(subgroup_level)) {
     data <- data[data[[subgroup]] == subgroup_level,]
   }
   
-  # Define adjustment variables based on subgroup
-  if(adjusted){
-    
-    data$log_distance <- log(data$distance)
-    
-    if(is.null(subgroup)){
-      adjust_vars <- c("age_group", "sex", "stunted", "log_distance", 
-                       "wealth_quintile", "season")
-    }else{
+
+    # Define adjustment variables based on subgroup
+    if(adjusted){
       
-      if(subgroup == "age_group"){
-        adjust_vars <- c("sex", "stunted", "log_distance", 
-                         "wealth_quintile", "season")} 
-      if(subgroup == "sex"){
-        adjust_vars <- c("age_group", "stunted", "log_distance", 
-                         "wealth_quintile", "season")} 
+      data$log_distance <- log(data$distance)
+      
+      if(is.null(subgroup)){
+        adjust_vars <- c("study", "age_group", "sex", "stunted", "log_distance", 
+                         "wealth_quintile", "season")
+      }else{
+        
+        if(subgroup == "age_group"){
+          adjust_vars <- c("study", "sex", "stunted", "log_distance", 
+                           "wealth_quintile", "season")} 
+        if(subgroup == "sex"){
+          adjust_vars <- c("study", "age_group", "stunted", "log_distance", 
+                           "wealth_quintile", "season")} 
+      }
+    }else{
+      adjust_vars <- NULL
     }
-  }else{
-    adjust_vars <- NULL
-  }
-  
-  # 1. Cox Model for Hazard Ratio
-  hr_formula <- if(adjusted) {
-    as.formula(paste("Surv(time, status) ~ treatment +", 
-                     paste(adjust_vars, collapse = " + "),
-                     "+ cluster(cluster_id)"))
-  }else{
-    Surv(time, status) ~ treatment# + cluster(cluster_id)
-  }
+    
+    # 1. Cox Model for Hazard Ratio
+    hr_formula <- if(adjusted) {
+      as.formula(paste("Surv(time, status) ~ treatment +", 
+                       paste(adjust_vars, collapse = " + "),
+                       "+ cluster(cluster_id)"))
+    }else{
+      Surv(time, status) ~ treatment# + cluster(cluster_id)
+    }
   
   cox_fit <- survival::coxph(hr_formula, data = data)
   

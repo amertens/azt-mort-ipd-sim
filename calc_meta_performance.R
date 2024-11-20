@@ -68,6 +68,34 @@ res_RE <- d_RE %>% group_by(level, metric, adjusted) %>%
             coverage=mean(lower<=true_value & true_value<=upper)*100,
             O_coverage=mean(effect -1.96*sd(effect )< true_value & true_value < effect +1.96*sd(effect ))*100)
 
+
+#need to get 100 iterations for all
+d_RE %>% group_by(level,metric, adjusted) %>% summarize(mean(iteration))
+  
+res_RE_summarized <- d_RE %>% group_by(level,metric, adjusted) %>% 
+  #TEMP
+  filter(iteration <901) %>%
+  summarise(n=n(),
+            true_value=true_value[1],
+            abs_bias=mean(abs(effect - true_value)),
+            estimator_variance=mean(((effect )-mean((effect )))^2),
+            mean_variance=mean((se)^2),
+            bias_se_ratio=abs_bias/sqrt(mean_variance),
+            power=mean((lower<0 & upper<0)|(lower>0 & upper>0))*100,
+            coverage=mean(lower<=true_value & true_value<=upper)*100,
+            O_coverage=mean(effect -1.96*sd(effect )< true_value & true_value < effect +1.96*sd(effect ))*100) %>%
+  group_by(metric, adjusted) %>%
+  summarise(n=sum(n),
+            abs_bias=mean(abs_bias),
+            estimator_variance=mean(estimator_variance),
+            mean_variance=mean(mean_variance),
+            bias_se_ratio=mean(bias_se_ratio),
+            power=mean(power),
+            coverage=mean(coverage),
+            O_coverage=mean(O_coverage)) %>%
+  filter(!is.na(abs_bias))
+
+
 #transform data to long format
 resRR_study_long_FE <- res_FE %>% 
   select(level, metric, adjusted, abs_bias, estimator_variance, mean_variance, bias_se_ratio, power, coverage, O_coverage ) %>%
@@ -124,4 +152,4 @@ ggplot(resRR_long ,
   guides(color=guide_legend(title="Estimator"), shape=guide_legend(title="Estimator"))
 
 
-save(tabRD_FE, tabRR_FE, tabRD_RE, tabRR_RE, resRR_long, file=here("results/meta_performance.rdata"))
+save(tabRD_FE, tabRR_FE, tabRD_RE, tabRR_RE, res_RE_summarized, resRR_long, file=here("results/meta_performance.rdata"))
