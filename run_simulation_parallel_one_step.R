@@ -21,7 +21,7 @@ iter_df =NULL
 iter_range=c(1,1000)
 
 sim=1
-n_cores=50
+n_cores=20
 
 
 run_sim_par <- function(full_res = NULL,
@@ -41,11 +41,15 @@ run_sim_par <- function(full_res = NULL,
       study_name = study_name
     )
   }))
+  
+  sim_study_data$study <- factor(sim_study_data$study)
 
   # Run analyses
-  results <- run_analysis(studies_data=sim_study_data, adjusted=adjusted, run_tmle=run_tmle)
+  results <- run_analysis(studies_data=sim_study_data, adjusted=adjusted, run_tmle=run_tmle, one_step=TRUE)
+  #results <- run_analysis(studies_data=sim_study_data, adjusted=TRUE, run_tmle=FALSE, one_step=TRUE)
   
   results$iteration = sim
+  
   
   full_res=bind_rows(full_res, results)
   
@@ -81,13 +85,14 @@ for(i in 1:20){
                                                         run_tmle=TRUE))
   resdf=data.table::rbindlist(res)
   full_res=bind_rows(full_res, resdf)
-  saveRDS(full_res, file=here("results/sim_results_interim_par.rds"))
+  saveRDS(full_res, file=here("results/sim_results_interim_par_1step_FE.rds"))
 }
 
 length(unique(full_res$iteration))
 
-saveRDS(full_res, file=here("results/sim_results_par.rds"))
+saveRDS(full_res, file=here("results/sim_results_par_1step_FE.rds"))
 stopCluster(cl)
+
 
 
 
