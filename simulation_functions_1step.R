@@ -1,10 +1,71 @@
 
 
-analyze_trial_data_1step <- function(data, 
-                               subgroup = NULL,     # "age_group", "sex", or NULL
-                               subgroup_level = NULL, # specific level for subgroup
-                               adjusted = TRUE,
-                               run_tmle=FALSE){
+# Load required packages
+rm(list=ls())
+library(tidyverse)
+library(survival)
+library(lme4)
+library(here)
+library(metafor)
+library(foreach)
+library(doParallel)
+library(sandwich)
+source("simulation_functions.R")
+source("sim_data_functions.R")
+source("study_params.R")
+
+
+
+# simulation parameters
+full_res = NULL
+iter_df =NULL
+iter_range=c(1,1000)
+
+sim=1
+n_cores=20
+
+
+
+full_res = NULL
+sim =NULL
+adjusted=FALSE
+run_tmle=FALSE
+
+  set.seed(sim)
+  # Generate data for all studies
+  sim_study_data <- do.call(rbind, lapply(names(study_params), function(study_name) {
+    params <- study_params[[study_name]]
+    simulate_trial_data(
+      n_clusters = params$n_clusters,
+      cluster_size = params$cluster_size,
+      baseline_rate = params$baseline_rate,
+      effect_size = params$effect_size,
+      cv = params$cv,
+      study_name = study_name
+    )
+  }))
+
+  sim_study_data$study <- factor(sim_study_data$study)
+
+# Run analyses
+studies_data=sim_study_data
+adjusted=TRUE
+run_tmle=FALSE
+one_step=TRUE
+
+
+results <- run_analysis_one_step(studies_data=sim_study_data, adjusted=TRUE, run_tmle=FALSE){
+
+ #  full_res=NULL
+ #  data=studies_data
+ #  
+ # adjusted=TRUE
+ # run_tmle=TRUE
+ #  
+ # subgroup = NULL # "age_group", "sex", or NULL
+ # subgroup_level = NULL # specific level for subgroup
+ # adjusted = TRUE
+ # run_tmle=FALSE
   
   # Filter for subgroup if specified
   if(!is.null(subgroup) && !is.null(subgroup_level)) {
@@ -40,38 +101,32 @@ analyze_trial_data_1step <- function(data,
     as.formula(paste("dead ~ treatment +", 
                      paste(adjust_vars, collapse = " + "), " + (cluster_id|study)"))
   }else{
-    dead ~ treatment 
+    dead ~ treatment + (cluster_id|study)
   }
   
   
   #need to check how to get the CID and CIR
-  fit_cir <- lmer(as.formula(cir_formula),
-                 #family = poisson(link = "log"),
-                 data = data)
+  fit_cir <- glmer(as.formula(cir_formula), family = binomial(link = "log"), data = data)
   res= summary(fit_cir)$coefficients
-  
 
   # Extract results
   coef_cir <- res[2,1]
   se_cir <- res[2,2]
   
-  
   #6 CID
-  fit_cid <- glm(as.formula(cir_formula), family = "gaussian", data = data)
-  
-  # Get robust standard errors
-  vcov_robust_cid <- vcovCL(fit_cid, cluster = data$cluster_id, type = "HC1")
+  fit_cid <- lmer(as.formula(cir_formula),data = data)
+  res_cid = summary(fit_cid)$coefficients
   
   # Extract results
-  coef_cid <- coef(fit_cid)["treatment"]
-  se_cid <- sqrt(vcov_robust_cid["treatment", "treatment"])
+  coef_cid <- res_cid[2,1]
+  se_cid <- res_cid[2,2]
   
   res = data.frame(
-    hr=coef_hr,
-    hr_se=se_hr,
-    hr_ci_lb=coef_hr - 1.96*se_hr,
-    hr_ci_ub=coef_hr + 1.96*se_hr,
-    hr_pval=hr_pval,
+    # hr=coef_hr,
+    # hr_se=se_hr,
+    # hr_ci_lb=coef_hr - 1.96*se_hr,
+    # hr_ci_ub=coef_hr + 1.96*se_hr,
+    # hr_pval=hr_pval,
     cir=coef_cir,
     cir_se=se_cir,
     cir_ci_lb=coef_cir - 1.96*se_cir,
