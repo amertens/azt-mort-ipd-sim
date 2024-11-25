@@ -1,71 +1,75 @@
 
 
-# Load required packages
-rm(list=ls())
-library(tidyverse)
-library(survival)
-library(lme4)
-library(here)
-library(metafor)
-library(foreach)
-library(doParallel)
-library(sandwich)
-source("simulation_functions.R")
-source("sim_data_functions.R")
-source("study_params.R")
+# # Load required packages
+# rm(list=ls())
+# library(tidyverse)
+# library(survival)
+# library(lme4)
+# library(lmerTest)
+# library(here)
+# library(metafor)
+# library(foreach)
+# library(doParallel)
+# library(sandwich)
+# source("simulation_functions.R")
+# source("sim_data_functions.R")
+# source("study_params.R")
+# 
+# 
+# 
+# # simulation parameters
+# full_res = NULL
+# iter_df =NULL
+# iter_range=c(1,1000)
+# 
+# sim=1
+# n_cores=20
+# 
+# 
+# 
+# full_res = NULL
+# sim =NULL
+# adjusted=FALSE
+# run_tmle=FALSE
+# 
+#   set.seed(sim)
+#   # Generate data for all studies
+#   sim_study_data <- do.call(rbind, lapply(names(study_params), function(study_name) {
+#     params <- study_params[[study_name]]
+#     simulate_trial_data(
+#       n_clusters = params$n_clusters,
+#       cluster_size = params$cluster_size,
+#       baseline_rate = params$baseline_rate,
+#       effect_size = params$effect_size,
+#       cv = params$cv,
+#       study_name = study_name
+#     )
+#   }))
+# 
+#   sim_study_data$study <- factor(sim_study_data$study)
+# 
+# # Run analyses
+# studies_data=sim_study_data
+# adjusted=TRUE
+# run_tmle=FALSE
+# one_step=TRUE
 
 
+run_analysis_one_step<-function(studies_data=sim_study_data, adjusted=TRUE, run_tmle=FALSE){
+  
+  require(lme4)
+  require(lmerTest)
 
-# simulation parameters
-full_res = NULL
-iter_df =NULL
-iter_range=c(1,1000)
+  full_res=NULL
+  data=studies_data
 
-sim=1
-n_cores=20
+ adjusted=TRUE
+ run_tmle=TRUE
 
-
-
-full_res = NULL
-sim =NULL
-adjusted=FALSE
-run_tmle=FALSE
-
-  set.seed(sim)
-  # Generate data for all studies
-  sim_study_data <- do.call(rbind, lapply(names(study_params), function(study_name) {
-    params <- study_params[[study_name]]
-    simulate_trial_data(
-      n_clusters = params$n_clusters,
-      cluster_size = params$cluster_size,
-      baseline_rate = params$baseline_rate,
-      effect_size = params$effect_size,
-      cv = params$cv,
-      study_name = study_name
-    )
-  }))
-
-  sim_study_data$study <- factor(sim_study_data$study)
-
-# Run analyses
-studies_data=sim_study_data
-adjusted=TRUE
-run_tmle=FALSE
-one_step=TRUE
-
-
-results <- run_analysis_one_step(studies_data=sim_study_data, adjusted=TRUE, run_tmle=FALSE){
-
- #  full_res=NULL
- #  data=studies_data
- #  
- # adjusted=TRUE
- # run_tmle=TRUE
- #  
- # subgroup = NULL # "age_group", "sex", or NULL
- # subgroup_level = NULL # specific level for subgroup
- # adjusted = TRUE
- # run_tmle=FALSE
+ subgroup = NULL # "age_group", "sex", or NULL
+ subgroup_level = NULL # specific level for subgroup
+ adjusted = TRUE
+ run_tmle=FALSE
   
   # Filter for subgroup if specified
   if(!is.null(subgroup) && !is.null(subgroup_level)) {
@@ -79,15 +83,15 @@ results <- run_analysis_one_step(studies_data=sim_study_data, adjusted=TRUE, run
     data$log_distance <- log(data$distance)
     
     if(is.null(subgroup)){
-      adjust_vars <- c("study", "age_group", "sex", "stunted", "log_distance", 
+      adjust_vars <- c("age_group", "sex", "stunted", "log_distance", 
                        "wealth_quintile", "season")
     }else{
       
       if(subgroup == "age_group"){
-        adjust_vars <- c("study", "sex", "stunted", "log_distance", 
+        adjust_vars <- c("sex", "stunted", "log_distance", 
                          "wealth_quintile", "season")} 
       if(subgroup == "sex"){
-        adjust_vars <- c("study", "age_group", "stunted", "log_distance", 
+        adjust_vars <- c("age_group", "stunted", "log_distance", 
                          "wealth_quintile", "season")} 
     }
   }else{
@@ -112,6 +116,7 @@ results <- run_analysis_one_step(studies_data=sim_study_data, adjusted=TRUE, run
   # Extract results
   coef_cir <- res[2,1]
   se_cir <- res[2,2]
+  pval_cir <- res[2,4]
   
   #6 CID
   fit_cid <- lmer(as.formula(cir_formula),data = data)
@@ -120,6 +125,7 @@ results <- run_analysis_one_step(studies_data=sim_study_data, adjusted=TRUE, run
   # Extract results
   coef_cid <- res_cid[2,1]
   se_cid <- res_cid[2,2]
+  pval_cid <- 2*pt(-abs(res_cid[2,3]), df=nrow(data)-1) 
   
   res = data.frame(
     # hr=coef_hr,
@@ -131,12 +137,12 @@ results <- run_analysis_one_step(studies_data=sim_study_data, adjusted=TRUE, run
     cir_se=se_cir,
     cir_ci_lb=coef_cir - 1.96*se_cir,
     cir_ci_ub=coef_cir + 1.96*se_cir,
-    cir_pval=summary(fit_cir)$coefficients["treatment", 4],
+    cir_pval=pval_cir,
     cid=coef_cid,
     cid_se=se_cid,
     cid_ci_lb=coef_cid - 1.96*se_cid,
     cid_ci_ub=coef_cid + 1.96*se_cid,
-    cid_pval=summary(fit_cid)$coefficients["treatment", 4]
+    cid_pval=pval_cid
   )
   
   #tmle estimates
