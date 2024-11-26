@@ -9,6 +9,7 @@ library(metafor)
 library(foreach)
 library(doParallel)
 library(sandwich)
+library(SuperLearner)
 source("simulation_functions_1step.R")
 source("sim_data_functions.R")
 source("study_params.R")
@@ -23,9 +24,7 @@ iter_range=c(1,1000)
 sim=1
 n_cores=50
 
-run_sim_par <- function(full_res = NULL,
-                        sim =NULL,
-                        adjusted=FALSE, run_tmle=FALSE){
+run_sim_par <- function(full_res = NULL,sim =NULL){
   
   set.seed(sim)
   # Generate data for all studies
@@ -64,17 +63,15 @@ run_sim_par <- function(full_res = NULL,
 
 cl <- makeCluster(n_cores)
 clusterExport(cl, c("run_sim_par","study_params","simulate_trial_data","generate_covariates",
-                    "run_analysis_one_step","iter_range"), envir=environment())
+                    "tmle_random_effects","iter_range"), envir=environment())
 
 
-clusterEvalQ(cl,lapply(c("tmle","data.table","tidyverse","survival","lme4","sandwich","here","ranger"), FUN = function(X) {
+clusterEvalQ(cl,lapply(c("tmle","SuperLearner","data.table","tidyverse","survival","lme4","sandwich","here","ranger"), FUN = function(X) {
   do.call("require", list(X))
 }))
 
 # temp = run_sim_par(full_res = NULL,
-#             sim =1,
-#             adjusted=FALSE,
-#             run_tmle=FALSE)
+#             sim =1)
 # temp
 
 full_res=NULL
@@ -84,9 +81,7 @@ full_res=NULL
 for(i in 1:20){
   cat(i,"\n")
   res=parLapply(cl=cl, c(((i-1)*50+1):(50*i)), function(z) run_sim_par(full_res = NULL,
-                                                        sim =z,
-                                                        adjusted=TRUE, 
-                                                        run_tmle=FALSE))
+                                                        sim =z))
   resdf=data.table::rbindlist(res)
   full_res=bind_rows(full_res, resdf)
   saveRDS(full_res, file=here("results/sim_results_interim_par_1step_tmle_RE.rds"))
@@ -96,34 +91,5 @@ length(unique(full_res$iteration))
 
 saveRDS(full_res, file=here("results/sim_results_par_1step_tmle_RE.rds"))
 stopCluster(cl)
-
-
-run_sim_par(full_res = NULL,
-            sim =1,
-            adjusted=FALSE, 
-            run_tmle=FALSE)
-
-#------------------------------------------------------------------------------
-# Unadjusted
-#------------------------------------------------------------------------------
-
-for(i in 1:20){
-  cat(i,"\n")
-  res=parLapply(cl=cl, c(((i-1)*50+1):(50*i)), function(z) run_sim_par(full_res = NULL,
-                                                                       sim =z,
-                                                                       adjusted=FALSE, 
-                                                                       run_tmle=FALSE))
-  resdf=data.table::rbindlist(res)
-  full_res=bind_rows(full_res, resdf)
-  saveRDS(full_res, file=here("results/sim_results_interim_par_1step_unadjusted_RE.rds"))
-}
-
-length(unique(full_res$iteration))
-
-saveRDS(full_res, file=here("results/sim_results_par_1step_unadjusted_RE.rds"))
-stopCluster(cl)
-
-
-
 
 

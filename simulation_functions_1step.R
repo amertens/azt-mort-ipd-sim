@@ -388,16 +388,3 @@ tmle_random_effects <- function(data,
   
 }
 
-# Simulation to test
-set.seed(123)
-
-# Define SuperLearner libraries
-Q.SL.library <- c("SL.glm", "SL.mean")
-g.SL.library <- c("SL.glm", "SL.mean")
-
-# Fit models
-results_1step <- tmle_random_effects(
-  data = sim_study_data,
-  Q.SL.library = Q.SL.library,
-  g.SL.library = g.SL.library
-)
