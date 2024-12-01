@@ -43,8 +43,8 @@ run_sim_par <- function(full_res = NULL,sim =NULL){
   sim_study_data$study <- factor(sim_study_data$study)
   
   # Define SuperLearner libraries
-  #SL.lib = c("SL.mean","SL.glm","SL.step.interaction","SL.ranger")
-  Q.SL.library <- g.SL.library <- c("SL.glm", "SL.mean")
+  #Q.SL.library <- g.SL.library <- c("SL.glm", "SL.mean")
+  Q.SL.library <- g.SL.library <- c("SL.mean","SL.glm","SL.step.interaction","SL.ranger")
 
   # Run analyses
   results <- tmle_random_effects(
@@ -75,10 +75,11 @@ clusterEvalQ(cl,lapply(c("tmle","SuperLearner","data.table","tidyverse","surviva
 # temp
 
 full_res=NULL
+full_res <- readRDS(here("results/sim_results_par_1step_tmle_RE.rds"))
  max(full_res$iteration)/50
 
 #for(i in iter_range[1]:(iter_range[2]/n_cores)){
-for(i in 1:20){
+for(i in 19:20){
   cat(i,"\n")
   res=parLapply(cl=cl, c(((i-1)*50+1):(50*i)), function(z) run_sim_par(full_res = NULL,
                                                         sim =z))

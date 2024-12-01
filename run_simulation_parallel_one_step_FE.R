@@ -25,7 +25,7 @@ n_cores=50
 
 run_sim_par <- function(full_res = NULL,
                         sim =NULL,
-                        adjusted=FALSE, run_tmle=FALSE){
+                        adjusted=FALSE, run_tmle=TRUE){
   
   set.seed(sim)
   # Generate data for all studies
@@ -73,7 +73,7 @@ for(i in 1:20){
   res=parLapply(cl=cl, c(((i-1)*50+1):(50*i)), function(z) run_sim_par(full_res = NULL,
                                                         sim =z,
                                                         adjusted=TRUE, 
-                                                        run_tmle=FALSE))
+                                                        run_tmle=TRUE))
   resdf=data.table::rbindlist(res)
   full_res=bind_rows(full_res, resdf)
   saveRDS(full_res, file=here("results/sim_results_interim_par_1step_FE.rds"))
