@@ -9,6 +9,7 @@ library(metafor)
 library(foreach)
 library(doParallel)
 source("sim_data_functions.R")
+source("simulation_functions.R")
 source("study_params.R")
 
 study_results <- readRDS(file=here("results/sim_results_interim_par.rds")) %>% mutate(adjusted=TRUE)
@@ -62,23 +63,55 @@ pool_results <- function(data, metric, method="REML"){
 #pool by iteration, metric, and subgroup
 pooled_results_RE <- study_results %>%
   group_by(iteration, metric, level, adjusted) %>%
-  do(pool_results(data=., metric=.$metric[1], method="REML")) 
+  do(pool_results(data=., metric=.$metric[1], method="REML")) %>% rename(
+    effect=est,
+    lower=lb,
+    upper=ub)
 
 
 pooled_results_FE <- study_results %>%
   group_by(iteration, metric, level, adjusted) %>%
-  do(pool_results(data=., metric=.$metric[1], method="FE")) 
-
-pooled_results_RE <- pooled_results_RE %>% rename(
-  effect=est,
-  lower=lb,
-  upper=ub)
-pooled_results_FE <- pooled_results_FE %>% rename(
-  effect=est,
-  lower=lb,
-  upper=ub)
+  do(pool_results(data=., metric=.$metric[1], method="FE"))  %>% rename(
+    effect=est,
+    lower=lb,
+    upper=ub)
 
 saveRDS(pooled_results_RE, file=here("results/pooled_results_RE.rds"))
 saveRDS(pooled_results_FE, file=here("results/pooled_results_FE.rds"))
+
+pooled_results_RE <- study_results %>%
+  group_by(iteration, metric, level, adjusted) %>%
+  do(pool_results(data=., metric=.$metric[1], method="REML")) %>% rename(
+    effect=est,
+    lower=lb,
+    upper=ub)
+
+
+pooled_results_RE_ML <- study_results %>%
+  group_by(iteration, metric, level, adjusted) %>%
+  do(pool_results(data=., metric=.$metric[1], method="ML"))  %>% rename(
+    effect=est,
+    lower=lb,
+    upper=ub)
+
+saveRDS(pooled_results_RE_ML, file=here("results/pooled_results_RE_ML.rds"))
+
+pooled_results_RE_DL <- study_results %>%
+  group_by(iteration, metric, level, adjusted) %>%
+  do(pool_results(data=., metric=.$metric[1], method="DL"))  %>% rename(
+    effect=est,
+    lower=lb,
+    upper=ub)
+
+saveRDS(pooled_results_RE_DL, file=here("results/pooled_results_RE_DL.rds"))
+
+pooled_results_RE_HE <- study_results %>%
+  group_by(iteration, metric, level, adjusted) %>%
+  do(pool_results(data=., metric=.$metric[1], method="HE"))  %>% rename(
+    effect=est,
+    lower=lb,
+    upper=ub)
+
+saveRDS(pooled_results_RE_HE, file=here("results/pooled_results_RE_HE.rds"))
 
 

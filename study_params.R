@@ -1,5 +1,5 @@
 
-#note: multiply all cluster_size by 1.1 because these numbers are based on 
+#note: multiply all cluster_size by 1.1 because these numbers are based on pre-loss to follow-up rates
 
 loss_rate_correction = 1.1
 

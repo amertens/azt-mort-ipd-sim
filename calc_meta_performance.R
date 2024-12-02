@@ -153,3 +153,84 @@ ggplot(resRR_long ,
 
 
 save(tabRD_FE, tabRR_FE, tabRD_RE, tabRR_RE, res_RE_summarized, resRR_long, file=here("results/meta_performance.rdata"))
+
+#-------------------------------------------------------------------------------
+
+
+
+clean_tab <- function(tab){
+  tab <- tab  %>% mutate(conversion=ifelse(metric %in% c("cid", "tmle_ate"),1000,100),
+                         metric=case_when(
+                           metric=="cid" ~ "GLM cumulative incidence difference",
+                           metric=="cir" ~ "GLM cumulative incidence ratio",
+                           metric=="tmle_ate" ~ "TMLE cumulative incidence difference",
+                           metric=="tmle_log_rr" ~ "TMLE cumulative incidence ratio"
+                         ))
+  
+  tab$abs_bias <- tab$abs_bias*tab$conversion
+  tab$mean_variance <- tab$mean_variance*tab$conversion
+  
+  tab$abs_bias <- round(tab$abs_bias, 3)
+  tab$mean_variance <- round(tab$mean_variance, 4)
+  tab$bias_se_ratio <- round(tab$bias_se_ratio, 3)
+  tab$O_coverage <- round(tab$O_coverage, 2)
+  tab$power <- round(tab$power, 2)
+  
+  tab <- tab %>%
+    rename(Parameter=metric,Adjusted=adjusted, `Absolute bias`=abs_bias , `Mean variance`=mean_variance , `Bias/SE ratio`=bias_se_ratio,
+           `Power`=power , `CI coverage`=coverage , `Oracle coverage`=O_coverage)
+  return(tab)
+}
+
+tabRD_RE <- clean_tab(tabRD_RE)
+tabRR_RE <- clean_tab(tabRR_RE)
+res_RE_summarized <- clean_tab(res_RE_summarized)
+
+
+
+
+
+
+
+## Comparison of different parameters
+
+#*Note the bias and variance columns are multiplied by 1000 for readability
+
+tab1 <- tabRD_RE %>% filter(grepl("GLM",Parameter), Adjusted) %>% select(Parameter, `Oracle coverage`,`Absolute bias`,`Mean variance`,`Bias/SE ratio`,`Power`,`CI coverage`) %>% arrange(abs(`Oracle coverage`-95))
+tab2 <- tabRR_RE %>% filter(grepl("GLM",Parameter), Adjusted) %>% select(Parameter, `Oracle coverage`,`Absolute bias`,`Mean variance`,`Bias/SE ratio`,`Power`,`CI coverage`) %>% arrange(abs(`Oracle coverage`-95))
+tab <- bind_rows(tab1, tab2)
+
+
+## Comparison of adjusted and unadjusted
+tabRD_RE <- tabRD_RE %>% mutate(level=factor(level, levels=rev(c("24-59mo",  "12-23mo", "6-11mo","1-5mo" ,"female","male","main"))))
+tab <- tabRD_RE %>% filter(grepl("GLM",Parameter)) %>% select(Adjusted, `Oracle coverage`,`Absolute bias`,`Mean variance`,`Bias/SE ratio`,`Power`,`CI coverage`) %>% arrange(level, Adjusted)
+tab
+
+tab <- tabRD_RE %>% filter(grepl("diff",Parameter), level=="main") %>% select(Adjusted, `Oracle coverage`,`Absolute bias`,`Mean variance`,`Bias/SE ratio`,`Power`,`CI coverage`) %>% arrange(level, Adjusted)
+tab
+
+
+tab <- res_RE_summarized %>% filter(grepl("diff",Parameter)) %>% select(Parameter,Adjusted, `Oracle coverage`,`Absolute bias`,`Mean variance`,`Bias/SE ratio`,`Power`,`CI coverage`) %>% arrange(abs(`Oracle coverage`-95))
+tab
+
+## Comparison of estimators
+
+```{r, echo=FALSE}
+
+tab <- res_RE_summarized %>% filter(Adjusted) %>% select(Parameter,`Oracle coverage`,`Absolute bias`,`Mean variance`,`Bias/SE ratio`,`Power`,`CI coverage`) %>% arrange(abs(`Oracle coverage`-95))
+knitr::kable(tab)
+
+
+```
+
+
+## Comparison on 1 and 2-step IPD's
+
+```{r}
+
+
+#tab1step %>% filter(grepl("GLM",metric),grepl("RE",pooling))
+tab1step %>% filter(grepl("TMLE",metric),grepl("RE",pooling)) %>% knitr::kable()
+
+
+```

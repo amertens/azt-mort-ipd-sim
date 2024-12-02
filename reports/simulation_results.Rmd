@@ -15,43 +15,118 @@ library(knitr)
 
 load(here("results/meta_performance.rdata"))
 
-clean_tab <- function(tab){
-  tab$abs_bias <- tab$abs_bias*1000
-  tab$mean_variance <- tab$mean_variance*1000
+tab1step <- readRDS(here::here("results/one_step_comparison.RDS"))
+
+
+clean_tab <- function(tab, level=TRUE){
+  tab <- tab  %>% mutate(conversion=ifelse(metric %in% c("cid", "tmle_ate"),1000,100),
+                          metric=case_when(
+                          metric=="cid" ~ "GLM cumulative incidence difference",
+                          metric=="cir" ~ "GLM cumulative incidence ratio",
+                          metric=="tmle_ate" ~ "TMLE cumulative incidence difference",
+                          metric=="tmle_log_rr" ~ "TMLE cumulative incidence ratio"
+                        ))
+
+  tab$abs_bias <- tab$abs_bias*tab$conversion
+  tab$mean_variance <- tab$mean_variance*tab$conversion
   
-  tab$abs_bias <- round(tab$abs_bias, 2)
-  tab$mean_variance <- round(tab$mean_variance, 2)
-  tab$bias_se_ratio <- round(tab$bias_se_ratio, 2)
-  tab$O_coverage <- round(tab$O_coverage, 1)
-  tab$power <- round(tab$power, 1)
-  return(tab)
+  tab$abs_bias <- round(tab$abs_bias, 3)
+  tab$mean_variance <- round(tab$mean_variance, 4)
+  tab$bias_se_ratio <- round(tab$bias_se_ratio, 3)
+  tab$coverage <- round(tab$coverage, 2)
+  tab$O_coverage <- round(tab$O_coverage, 2)
+  tab$power <- round(tab$power, 2)
+       tab <- tab %>%
+  rename(Parameter=metric,Adjusted=adjusted, `Absolute bias`=abs_bias , `Mean variance`=mean_variance , `Bias/SE ratio`=bias_se_ratio,
+         `Power`=power , `CI coverage`=coverage , `Oracle coverage`=O_coverage) %>% ungroup()
+       
+  if(level){
+  tab <- tab %>% 
+  mutate(Level=factor(level, levels=rev(c("24-59mo",  "12-23mo", "6-11mo" ,"1-5mo", "female","male","main"))))
+  }
+
+  
+return(tab)
 }
 
 tabRD_RE <- clean_tab(tabRD_RE)
 tabRR_RE <- clean_tab(tabRR_RE)
-tabRR_RE <- clean_tab(res_RE_summarized)
+res_RE_summarized <- clean_tab(res_RE_summarized, level=FALSE)
        
 
 ```
 
 #Write a paragraph here about the setup of the simulation in this repo:
 
+## Setup of simulation
+
+-1000 iterations, define oracle coverage
 
 
-## Simulation tables
 
-Note the bias and variance columns are multiplied by 1000 for readability
+## Comparison of different parameters
 
-```{r}
+*Note the bias and variance columns are multiplied by 1000 for readability
 
-knitr::kable(tabRD_RE)
-knitr::kable(tabRR_RE)
-knitr::kable(res_RE_summarized)
+```{r, echo=FALSE}
+
+tab1 <- tabRD_RE %>% filter(grepl("GLM",Parameter), Adjusted) %>% select(Level, Parameter, `Oracle coverage`,`Absolute bias`,`Mean variance`,`Bias/SE ratio`,`Power`,`CI coverage`) %>% arrange(Level, Parameter)
+tab2 <- tabRR_RE %>% filter(grepl("GLM",Parameter), Adjusted) %>% select(Level, Parameter, `Oracle coverage`,`Absolute bias`,`Mean variance`,`Bias/SE ratio`,`Power`,`CI coverage`) %>% arrange(Level, Parameter)
+tab <- bind_rows(tab1, tab2)
+tab %>% knitr::kable()
+
+```
+
+
+
+## Comparison of estimators
+
+```{r, echo=FALSE}
+
+tab <- res_RE_summarized %>% filter(grepl("diff",Parameter)) %>% select(Parameter,Adjusted, `Oracle coverage`,`Absolute bias`,`Mean variance`,`Bias/SE ratio`,`Power`,`CI coverage`) %>% arrange(abs(`Oracle coverage`-95))
+tab %>% knitr::kable()
 
 
 ```
 
-## Plot results
+-and adjusted and unadjusted
+
+
+## Comparison on 1 and 2-step IPD's
+
+```{r}
+
+
+tab1step %>% filter(grepl("TMLE cumulative incidence difference",Parameter),grepl("RE",Pooling))  %>% select(`Oracle coverage`,`Absolute bias`,`Mean variance`,`Bias/SE ratio`,`Power`,`CI coverage`) %>% knitr::kable()
+
+
+```
+*note abs_bias and mean_variance were scaled, they multiplied for readability by 1000 for difference measures and 100 for ratio measures. The ratio measures are evaluated on the log scale.
+
+*note the same relative differences in 1 versus 2-step performances are true when using regression models.
+
+*main intervention effect
+
+## Discussion of power across subgroups
+
+
+```{r, echo=FALSE}
+
+tab <- tabRD_RE %>% filter(grepl("TMLE cumulative incidence difference",Parameter),Adjusted) %>% select(Level, `Oracle coverage`,`Absolute bias`,`Mean variance`,`Bias/SE ratio`,`Power`,`CI coverage`) %>% arrange(abs(`Oracle coverage`-95))
+tab %>% knitr::kable()
+
+
+```
+
+## Assumptions and limitations of simulation study
+
+## Conclusions
+-is it worth it to do an IPD
+
+
+
+
+##  Plot results
 
 **Figure 1.** Performance metrics for the cumulative incidence difference across different subgroups pooled via random effects meta-analyses. The mean absolute bias,  mean variance, bias to standard error ratio, power, oracle coverage, and coverage are shown for each subgroup. The oracle coverage is the proportion of confidence intervals that contain the true value. The coverage is the proportion of confidence intervals that contain the true value where the confidence interval is constructed from the variance of the point estimates across the simulation iteractions. 
 
